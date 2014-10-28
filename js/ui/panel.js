@@ -820,7 +820,7 @@ const AggregateMenu = new Lang.Class({
         this.menu.actor.add_style_class_name('aggregate-menu');
 
         this._indicators = new St.BoxLayout({ style_class: 'panel-status-indicators-box' });
-        this.actor.add_child(this._indicators);
+        this.actor.add_actor(this._indicators);
 
         if (Config.HAVE_NETWORKMANAGER) {
             this._network = new imports.ui.status.network.NMApplet();
@@ -1106,7 +1106,7 @@ const Panel = new Lang.Class({
                 continue;
             if (indicator.menu)
                 indicator.menu.close();
-            indicator.container.hide();
+            indicator.actor.hide();
         }
     },
 
@@ -1138,21 +1138,14 @@ const Panel = new Lang.Class({
     },
 
     _addToPanelBox: function(role, indicator, position, box) {
-        let container = indicator.container;
-        container.show();
-
-        let parent = container.get_parent();
-        if (parent)
-            parent.remove_actor(container);
-
-        box.insert_child_at_index(container, position);
+        indicator.actor.show();
+        box.insert_child_at_index(indicator.actor, position);
         if (indicator.menu)
             this.menuManager.addMenu(indicator.menu);
         this.statusArea[role] = indicator;
         let destroyId = indicator.connect('destroy', Lang.bind(this, function(emitter) {
             delete this.statusArea[role];
             emitter.disconnect(destroyId);
-            container.destroy();
         }));
     },
 
