@@ -112,31 +112,6 @@ function _getCalendarDayAbbreviation(dayNumber) {
     return abbreviations[dayNumber];
 }
 
-function _getEventDayAbbreviation(dayNumber) {
-    let abbreviations = [
-        /* Translators: Event list abbreviation for Sunday.
-         *
-         * NOTE: These list abbreviations are normally not shown together
-         * so they need to be unique (e.g. Tuesday and Thursday cannot
-         * both be 'T').
-         */
-        C_("list sunday", "Su"),
-        /* Translators: Event list abbreviation for Monday */
-        C_("list monday", "M"),
-        /* Translators: Event list abbreviation for Tuesday */
-        C_("list tuesday", "T"),
-        /* Translators: Event list abbreviation for Wednesday */
-        C_("list wednesday", "W"),
-        /* Translators: Event list abbreviation for Thursday */
-        C_("list thursday", "Th"),
-        /* Translators: Event list abbreviation for Friday */
-        C_("list friday", "F"),
-        /* Translators: Event list abbreviation for Saturday */
-        C_("list saturday", "S")
-    ];
-    return abbreviations[dayNumber];
-}
-
 // Abstraction for an appointment/event in a calendar
 
 const CalendarEvent = new Lang.Class({
@@ -729,28 +704,10 @@ const EventsList = new Lang.Class({
         this._eventSource.connect('changed', Lang.bind(this, this._update));
     },
 
-    _addEvent: function(event, index, includeDayName, periodBegin, periodEnd) {
-        let dayString;
-        if (includeDayName) {
-            if (event.date >= periodBegin)
-                dayString = _getEventDayAbbreviation(event.date.getDay());
-            else /* show event end day if it began earlier */
-                dayString = _getEventDayAbbreviation(event.end.getDay());
-        } else {
-            dayString = '';
-        }
-
-        let dayLabel = new St.Label({ style_class: 'events-day-dayname',
-                                      text: dayString,
-                                      x_align: Clutter.ActorAlign.END,
-                                      y_align: Clutter.ActorAlign.START });
-        dayLabel.clutter_text.line_wrap = false;
-        dayLabel.clutter_text.ellipsize = false;
-
+    _addEvent: function(event, index, periodBegin, periodEnd) {
         let rtl = this.actor.get_text_direction() == Clutter.TextDirection.RTL;
 
         let layout = this.actor.layout_manager;
-        layout.attach(dayLabel, rtl ? 2 : 0, index, 1, 1);
         let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
         let timeString = _formatEventTime(event, clockFormat, periodBegin, periodEnd);
         let timeLabel = new St.Label({ style_class: 'events-day-time',
@@ -785,7 +742,7 @@ const EventsList = new Lang.Class({
         layout.attach(titleLabel, rtl ? 0 : 2, index, 1, 1);
     },
 
-    _addPeriod: function(header, index, periodBegin, periodEnd, includeDayName, showNothingScheduled) {
+    _addPeriod: function(header, index, periodBegin, periodEnd, showNothingScheduled) {
         let events = this._eventSource.getEvents(periodBegin, periodEnd);
 
         if (events.length == 0 && !showNothingScheduled)
@@ -797,7 +754,7 @@ const EventsList = new Lang.Class({
         index++;
 
         for (let n = 0; n < events.length; n++) {
-            this._addEvent(events[n], index, includeDayName, periodBegin, periodEnd);
+            this._addEvent(events[n], index, periodBegin, periodEnd);
             index++;
         }
 
@@ -828,7 +785,7 @@ const EventsList = new Lang.Class({
             dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
                                                              "%A, %B %d, %Y"));
         let dayString = day.toLocaleFormat(dayFormat);
-        this._addPeriod(dayString, 0, dayBegin, dayEnd, false, true);
+        this._addPeriod(dayString, 0, dayBegin, dayEnd, true);
     },
 
     _showToday: function() {
@@ -837,7 +794,7 @@ const EventsList = new Lang.Class({
         let now = new Date();
         let dayBegin = _getBeginningOfDay(now);
         let dayEnd = _getEndOfDay(now);
-        this._addPeriod(_("Events"), 0, dayBegin, dayEnd, false, true);
+        this._addPeriod(_("Events"), 0, dayBegin, dayEnd, true);
     },
 
     // Sets the event list to show events from a specific date
