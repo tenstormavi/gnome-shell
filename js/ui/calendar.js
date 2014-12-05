@@ -742,7 +742,7 @@ const EventsList = new Lang.Class({
         layout.attach(titleLabel, rtl ? 0 : 2, index, 1, 1);
     },
 
-    _addPeriod: function(header, index, periodBegin, periodEnd) {
+    _addPeriod: function(header, periodBegin, periodEnd) {
         let events = this._eventSource.getEvents(periodBegin, periodEnd);
 
         if (events.length == 0)
@@ -750,11 +750,10 @@ const EventsList = new Lang.Class({
 
         let label = new St.Label({ style_class: 'events-day-header', text: header });
         let layout = this.actor.layout_manager;
-        layout.attach(label, 0, index, 3, 1);
-        index++;
+        layout.attach(label, 0, 0, 3, 1);
 
         for (let n = 0; n < events.length; n++)
-            this._addEvent(events[n], index + n, periodBegin, periodEnd);
+            this._addEvent(events[n], n + 1, periodBegin, periodEnd);
     },
 
     _showOtherDay: function(day) {
@@ -774,7 +773,7 @@ const EventsList = new Lang.Class({
             dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
                                                              "%A, %B %d, %Y"));
         let dayString = day.toLocaleFormat(dayFormat);
-        this._addPeriod(dayString, 0, dayBegin, dayEnd);
+        this._addPeriod(dayString, dayBegin, dayEnd);
     },
 
     _showToday: function() {
@@ -783,7 +782,7 @@ const EventsList = new Lang.Class({
         let now = new Date();
         let dayBegin = _getBeginningOfDay(now);
         let dayEnd = _getEndOfDay(now);
-        this._addPeriod(_("Events"), 0, dayBegin, dayEnd);
+        this._addPeriod(_("Events"), dayBegin, dayEnd);
     },
 
     // Sets the event list to show events from a specific date
