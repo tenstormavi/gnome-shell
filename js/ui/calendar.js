@@ -11,6 +11,8 @@ const Gettext_gtk30 = imports.gettext.domain('gtk30');
 const Mainloop = imports.mainloop;
 const Shell = imports.gi.Shell;
 
+const Params = imports.misc.params;
+
 const MSECS_IN_DAY = 24 * 60 * 60 * 1000;
 const SHOW_WEEKDATE_KEY = 'show-weekdate';
 const ELLIPSIS_CHAR = '\u2026';
@@ -685,6 +687,58 @@ const Calendar = new Lang.Class({
 
 Signals.addSignalMethods(Calendar.prototype);
 
+const EventEntry = new Lang.Class({
+    Name: 'EventEntry',
+
+    _init: function(title, body, params) {
+        params = Params.parse(params, { gicon: null,
+                                        time: null });
+
+        let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
+        this.actor = new St.Button({ child: new St.Widget({ layout_manager: layout }),
+                                     style_class: 'event-button',
+                                     x_expand: true, x_fill: true });
+
+        this._icon = new St.Icon({ gicon: params.gicon });
+        layout.attach(this._icon, 0, 0, 1, 2);
+
+        this._title = new St.Label({ style_class: 'event-title',
+                                     text: title,
+                                     x_expand: true });
+        this._title.clutter_text.line_wrap = false;
+        this._title.clutter_text.ellipsize = true;
+        layout.attach(this._title, 1, 0, 1, 1);
+
+        this._time = new St.Label({ style_class: 'event-time',
+                                    x_align: Clutter.ActorAlign.END });
+        layout.attach(this._time, 2, 0, 1, 1);
+
+        let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
+                                      icon_size: 16 });
+        this._closeButton = new St.Button({ child: closeIcon });
+        layout.attach(this._closeButton, 3, 0, 1, 1);
+
+        this._body = new St.Label({ style_class: 'event-body', text: body,
+                                    x_expand: true });
+        this._body.clutter_text.line_wrap = false;
+        this._body.clutter_text.ellipsize = true;
+        layout.attach(this._body, 1, 1, 3, 1);
+
+        this._closeButton.connect('clicked', Lang.bind(this,
+            function() {
+                this.actor.destroy();
+            }));
+        this.actor.connect('notify::hover', Lang.bind(this, this._sync));
+        this._sync();
+    },
+
+    _sync: function() {
+        let hovered = this.actor.hover;
+        this._closeButton.visible = hovered;
+        this._time.visible = !hovered;
+    }
+});
+
 const EventsList = new Lang.Class({
     Name: 'EventsList',
 
@@ -705,41 +759,26 @@ const EventsList = new Lang.Class({
     },
 
     _addEvent: function(event, index, periodBegin, periodEnd) {
+        let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
+        let title = _formatEventTime(event, clockFormat, periodBegin, periodEnd);
+
         let rtl = this.actor.get_text_direction() == Clutter.TextDirection.RTL;
+        if (event.date < periodBegin && !event.allDay) {
+            if (rtl)
+                title = title + ELLIPSIS_CHAR;
+            else
+                title = ELLIPSIS_CHAR + title;
+        }
+        if (event.end > periodEnd && !event.allDay) {
+            if (rtl)
+                title = ELLIPSIS_CHAR + title;
+            else
+                title = title + ELLIPSIS_CHAR;
+        }
+        let eventEntry = new EventEntry(title, event.summary);
 
         let layout = this.actor.layout_manager;
-        let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
-        let timeString = _formatEventTime(event, clockFormat, periodBegin, periodEnd);
-        let timeLabel = new St.Label({ style_class: 'events-day-time',
-                                       text: timeString,
-                                       y_align: Clutter.ActorAlign.START });
-        timeLabel.clutter_text.line_wrap = false;
-        timeLabel.clutter_text.ellipsize = false;
-
-        let preEllipsisLabel = new St.Label({ style_class: 'events-day-time-ellipses',
-                                              text: ELLIPSIS_CHAR,
-                                              y_align: Clutter.ActorAlign.START });
-        let postEllipsisLabel = new St.Label({ style_class: 'events-day-time-ellipses',
-                                               text: ELLIPSIS_CHAR,
-                                               y_align: Clutter.ActorAlign.START });
-        if (event.allDay || event.date >= periodBegin)
-            preEllipsisLabel.opacity = 0;
-        if (event.allDay || event.end <= periodEnd)
-            postEllipsisLabel.opacity = 0;
-
-        let timeLabelBoxLayout = new St.BoxLayout();
-        timeLabelBoxLayout.add(preEllipsisLabel);
-        timeLabelBoxLayout.add(timeLabel);
-        timeLabelBoxLayout.add(postEllipsisLabel);
-        layout.attach(timeLabelBoxLayout, 1, index, 1, 1);
-
-        let titleLabel = new St.Label({ style_class: 'events-day-task',
-                                        text: event.summary,
-                                        x_expand: true });
-        titleLabel.clutter_text.line_wrap = true;
-        titleLabel.clutter_text.ellipsize = false;
-
-        layout.attach(titleLabel, rtl ? 0 : 2, index, 1, 1);
+        layout.attach(eventEntry.actor, 0, index, 1, 1);
     },
 
     _addPeriod: function(header, periodBegin, periodEnd) {
