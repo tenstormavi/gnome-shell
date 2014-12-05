@@ -1460,6 +1460,7 @@ StScrollBar StButton#vhandle:active {
 .events-table {
     width: 320px;
     spacing-columns: 6pt;
+    spacing-rows: 6pt;
     padding: 0 1.4em;
 }
 
@@ -1469,6 +1470,19 @@ StScrollBar StButton#vhandle:active {
 
 .events-table:rtl {
     padding-left: 1.9em;
+}
+
+.event-button {
+    background-color: #2c2c2c;
+    padding: 6px;
+}
+
+.event-button:hover {
+    background-color: #4c4c4c;
+}
+
+.event-title {
+    font-weight: bold;
 }
 
 .events-day-header {
