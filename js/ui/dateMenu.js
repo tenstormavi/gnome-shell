@@ -35,6 +35,58 @@ function _onVertSepRepaint(area) {
     cr.$dispose();
 }
 
+const TodayButton = new Lang.Class({
+    Name: 'TodayButton',
+
+    _init: function(calendar) {
+        // Having the ability to go to the current date if the user is already
+        // on the current date can be confusing. So don't make the button reactive
+        // until the selected date changes.
+        this.actor = new St.Button({ style_class: 'datemenu-today-button',
+                                     reactive: false
+                                   });
+        this.actor.connect('clicked', Lang.bind(this,
+            function() {
+                this._calendar.setDate(new Date(), false);
+            }));
+
+        let hbox = new St.BoxLayout({ vertical: true });
+        this.actor.add_actor(hbox);
+
+        this._dayLabel = new St.Label({ style_class: 'day-label',
+                                        x_align: Clutter.ActorAlign.START });
+        hbox.add_actor(this._dayLabel);
+
+        this._dateLabel = new St.Label({ style_class: 'date-label' });
+        hbox.add_actor(this._dateLabel);
+
+        this._calendar = calendar;
+        this._calendar.connect('selected-date-changed', Lang.bind(this,
+            function(calendar, date) {
+                // Make the button reactive only if the selected date is not the
+                // current date.
+                this.actor.can_focus = this.actor.reactive = !this._isToday(date)
+            }));
+    },
+
+    setDate: function(date) {
+        this._dayLabel.set_text(date.toLocaleFormat('%A'));
+
+        /* Translators: This is the date format to use when the calendar popup is
+         * shown - it is shown just below the time in the shell (e.g. "Tue 9:29 AM").
+         */
+        let dateFormat = Shell.util_translate_time_string (N_("%B %e %Y"));
+        this._dateLabel.set_text(date.toLocaleFormat(dateFormat));
+    },
+
+    _isToday: function(date) {
+        let now = new Date();
+        return now.getYear() == date.getYear() &&
+               now.getMonth() == date.getMonth() &&
+               now.getDate() == date.getDate();
+    }
+});
+
 const DateMenuButton = new Lang.Class({
     Name: 'DateMenuButton',
     Extends: PanelMenu.Button,
@@ -62,21 +114,12 @@ const DateMenuButton = new Lang.Class({
         vbox = new St.BoxLayout({vertical: true});
         hbox.add(vbox);
 
-        // Date
-        // Having the ability to go to the current date if the user is already
-        // on the current date can be confusing. So don't make the button reactive
-        // until the selected date changes.
-        this._date = new St.Button({ style_class: 'datemenu-date-label',
-                                     reactive: false
-                                   });
-        this._date.connect('clicked',
-                           Lang.bind(this, function() {
-                               this._calendar.setDate(new Date(), false);
-                           }));
-        vbox.add(this._date, { x_fill: false  });
-
         this._eventList = new Calendar.EventsList();
         this._calendar = new Calendar.Calendar();
+
+        // Date
+        this._date = new TodayButton(this._calendar);
+        vbox.add(this._date.actor, { x_fill: false  });
 
         this._calendar.connect('selected-date-changed',
                                Lang.bind(this, function(calendar, date) {
@@ -85,9 +128,6 @@ const DateMenuButton = new Lang.Class({
                                   // and the calender makes those dates unclickable when instantiated with
                                   // a null event source
                                    this._eventList.setDate(date);
-
-                                   // Make the button reactive only if the selected date is not the current date.
-                                   this._date.can_focus = this._date.reactive = !this._isToday(date)
                                }));
         vbox.add(this._calendar.actor);
 
@@ -125,12 +165,7 @@ const DateMenuButton = new Lang.Class({
             if (isOpen) {
                 let now = new Date();
                 this._calendar.setDate(now);
-
-                /* Translators: This is the date format to use when the calendar popup is
-                 * shown - it is shown just below the time in the shell (e.g. "Tue 9:29 AM").
-                 */
-                let dateFormat = Shell.util_translate_time_string (N_("%A %B %e, %Y"));
-                this._date.set_label(now.toLocaleFormat(dateFormat));
+                this._date.setDate(now);
             }
         }));
 
@@ -141,13 +176,6 @@ const DateMenuButton = new Lang.Class({
 
         Main.sessionMode.connect('updated', Lang.bind(this, this._sessionUpdated));
         this._sessionUpdated();
-    },
-
-    _isToday: function(date) {
-        let now = new Date();
-        return now.getYear() == date.getYear() &&
-               now.getMonth() == date.getMonth() &&
-               now.getDate() == date.getDate();
     },
 
     _appInstalledChanged: function() {
