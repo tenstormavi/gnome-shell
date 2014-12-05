@@ -833,36 +833,11 @@ const EventsList = new Lang.Class({
 
     _showToday: function() {
         this.actor.destroy_all_children();
-        let index = 0;
 
         let now = new Date();
         let dayBegin = _getBeginningOfDay(now);
         let dayEnd = _getEndOfDay(now);
-        index = this._addPeriod(_("Today"), index, dayBegin, dayEnd, false, true);
-
-        let tomorrowBegin = new Date(dayBegin.getTime() + 86400 * 1000);
-        let tomorrowEnd = new Date(dayEnd.getTime() + 86400 * 1000);
-        index = this._addPeriod(_("Tomorrow"), index, tomorrowBegin, tomorrowEnd, false, true);
-
-        let dayInWeek = (dayEnd.getDay() - this._weekStart + 7) % 7;
-
-        if (dayInWeek < 5) {
-            /* If now is within the first 5 days we show "This week" and
-             * include events up until and including Saturday/Sunday
-             * (depending on whether a week starts on Sunday/Monday).
-             */
-            let thisWeekBegin = new Date(dayBegin.getTime() + 2 * 86400 * 1000);
-            let thisWeekEnd = new Date(dayEnd.getTime() + (6 - dayInWeek) * 86400 * 1000);
-            index = this._addPeriod(_("This week"), index, thisWeekBegin, thisWeekEnd, true, false);
-        } else {
-            /* otherwise it's one of the two last days of the week ... show
-             * "Next week" and include events up until and including *next*
-             * Saturday/Sunday
-             */
-            let nextWeekBegin = new Date(dayBegin.getTime() + 2 * 86400 * 1000);
-            let nextWeekEnd = new Date(dayEnd.getTime() + (13 - dayInWeek) * 86400 * 1000);
-            index = this._addPeriod(_("Next week"), index, nextWeekBegin, nextWeekEnd, true, false);
-        }
+        this._addPeriod(_("Events"), 0, dayBegin, dayEnd, false, true);
     },
 
     // Sets the event list to show events from a specific date
