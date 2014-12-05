@@ -742,30 +742,19 @@ const EventsList = new Lang.Class({
         layout.attach(titleLabel, rtl ? 0 : 2, index, 1, 1);
     },
 
-    _addPeriod: function(header, index, periodBegin, periodEnd, showNothingScheduled) {
+    _addPeriod: function(header, index, periodBegin, periodEnd) {
         let events = this._eventSource.getEvents(periodBegin, periodEnd);
 
-        if (events.length == 0 && !showNothingScheduled)
-            return index;
+        if (events.length == 0)
+            return;
 
         let label = new St.Label({ style_class: 'events-day-header', text: header });
         let layout = this.actor.layout_manager;
         layout.attach(label, 0, index, 3, 1);
         index++;
 
-        for (let n = 0; n < events.length; n++) {
-            this._addEvent(events[n], index, periodBegin, periodEnd);
-            index++;
-        }
-
-        if (events.length == 0 && showNothingScheduled) {
-            /* Translators: Text to show if there are no events */
-            let nothingEvent = new CalendarEvent(periodBegin, periodBegin, _("Nothing Scheduled"), true);
-            this._addEvent(nothingEvent, index, false, periodBegin, periodEnd);
-            index++;
-        }
-
-        return index;
+        for (let n = 0; n < events.length; n++)
+            this._addEvent(events[n], index + n, periodBegin, periodEnd);
     },
 
     _showOtherDay: function(day) {
@@ -785,7 +774,7 @@ const EventsList = new Lang.Class({
             dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
                                                              "%A, %B %d, %Y"));
         let dayString = day.toLocaleFormat(dayFormat);
-        this._addPeriod(dayString, 0, dayBegin, dayEnd, true);
+        this._addPeriod(dayString, 0, dayBegin, dayEnd);
     },
 
     _showToday: function() {
@@ -794,7 +783,7 @@ const EventsList = new Lang.Class({
         let now = new Date();
         let dayBegin = _getBeginningOfDay(now);
         let dayEnd = _getEndOfDay(now);
-        this._addPeriod(_("Events"), 0, dayBegin, dayEnd, true);
+        this._addPeriod(_("Events"), 0, dayBegin, dayEnd);
     },
 
     // Sets the event list to show events from a specific date
