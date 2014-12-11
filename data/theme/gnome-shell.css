@@ -1531,6 +1531,21 @@ StScrollBar StButton#vhandle:active {
     padding-right: 8pt;
 }
 
+.message-list-section-list {
+    spacing: 6px;
+}
+
+.message-list-section-close > StIcon {
+    icon-size: 16px;
+    color: rgba(0, 0, 0, 0.9);
+    background-color: #2c2c2c;
+    border-radius: 8px;
+}
+
+.message-list-section-close:hover > StIcon {
+    background-color: #4c4c4c;
+}
+
 /* Message Tray */
 
 #message-tray {

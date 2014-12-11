@@ -739,6 +739,153 @@ const EventEntry = new Lang.Class({
     }
 });
 
+const MessageListSection = new Lang.Class({
+    Name: 'MessageListSection',
+
+    _init: function(title, callback) {
+        this.actor = new St.BoxLayout({ style_class: 'message-list-section',
+                                        x_expand: true, vertical: true });
+        let titleBox = new St.BoxLayout();
+        this.actor.add_actor(titleBox);
+
+        let hasCallback = typeof callback == 'function';
+        this._title = new St.Button({ style_class: 'message-list-section-title',
+                                      reactive: hasCallback,
+                                      x_expand: true });
+        this._title.set_x_align(Clutter.ActorAlign.START);
+        titleBox.add_actor(this._title);
+
+        let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic' });
+        this._closeButton = new St.Button({ style_class: 'message-list-section-close',
+                                            child: closeIcon });
+        this._closeButton.set_x_align(Clutter.ActorAlign.END);
+        titleBox.add_actor(this._closeButton);
+
+        this._list = new St.BoxLayout({ style_class: 'message-list-section-list',
+                                        vertical: true });
+        this.actor.add_actor(this._list);
+
+        this._title.connect('clicked', Lang.bind(this,
+            function() {
+                if (hasCallback)
+                    callback();
+            }));
+        this._closeButton.connect('clicked', Lang.bind(this, this.clear));
+        this._list.connect('actor-added', Lang.bind(this, this._sync));
+        this._list.connect('actor-removed', Lang.bind(this, this._sync));
+        this._date = new Date();
+        this._sync();
+    },
+
+    setDate: function(date) {
+        if (!_sameDay(date, this._date)) {
+            this._date = date;
+            this._sync();
+        }
+    },
+
+    clear: function() {
+        this._list.destroy_all_children();
+    },
+
+    _shouldShowForDate: function() {
+        let today = new Date();
+        return _sameDay(this._date, today);
+    },
+
+    _sync: function() {
+        this.actor.visible = this._list.get_n_children() > 0 &&
+                             this._shouldShowForDate();
+    }
+});
+
+const EventsSection = new Lang.Class({
+    Name: 'EventsSection',
+    Extends: MessageListSection,
+
+    _init: function() {
+        this._desktopSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+        this._desktopSettings.connect('changed', Lang.bind(this, this._reloadEvents));
+        this._eventSource = new EmptyEventSource();
+
+        this.parent('', null);
+    },
+
+    setEventSource: function(eventSource) {
+        this._eventSource = eventSource;
+        this._eventSource.connect('changed', Lang.bind(this, this._reloadEvents));
+    },
+
+    _updateTitle: function() {
+        let now = new Date();
+        if (_sameDay(this._date, now)) {
+            this._title.label = _("Events");
+            return;
+        }
+
+        let dayFormat;
+        if (_sameYear(this._date, now))
+            /* Translators: Shown on calendar heading when selected day occurs on current year */
+            dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
+                                                             "%A, %B %d"));
+        else
+            /* Translators: Shown on calendar heading when selected day occurs on different year */
+            dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
+                                                             "%A, %B %d, %Y"));
+        this._title.label = this._date.toLocaleFormat(dayFormat);
+    },
+
+    _reloadEvents: function() {
+        if (this._eventSource.isLoading)
+            return;
+
+        this.clear();
+
+        let periodBegin = _getBeginningOfDay(this._date);
+        let periodEnd = _getEndOfDay(this._date);
+        let events = this._eventSource.getEvents(periodBegin, periodEnd);
+
+        if (events.length == 0)
+            return;
+
+        let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
+        for (let i = 0; i < events.length; i++) {
+            let event = events[i];
+            let title = _formatEventTime(event, clockFormat, periodBegin, periodEnd);
+
+            let rtl = this.actor.get_text_direction() == Clutter.TextDirection.RTL;
+            if (event.date < periodBegin && !event.allDay) {
+                if (rtl)
+                    title = title + ELLIPSIS_CHAR;
+                else
+                    title = ELLIPSIS_CHAR + title;
+            }
+            if (event.end > periodEnd && !event.allDay) {
+                if (rtl)
+                    title = ELLIPSIS_CHAR + title;
+                else
+                    title = title + ELLIPSIS_CHAR;
+            }
+            let eventEntry = new EventEntry(title, event.summary);
+            this._list.add(eventEntry.actor);
+        }
+    },
+
+    setDate: function(date) {
+        this.parent(date);
+        this._updateTitle();
+        this._reloadEvents();
+    },
+
+    _sync: function() {
+        this.parent();
+    },
+
+    _shouldShowForDate: function() {
+        return true;
+    }
+});
+
 const EventsList = new Lang.Class({
     Name: 'EventsList',
 
@@ -747,100 +894,16 @@ const EventsList = new Lang.Class({
         this.actor = new St.Widget({ style_class: 'events-table',
                                      layout_manager: layout });
         layout.hookup_style(this.actor);
-        this._date = new Date();
-        this._desktopSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
-        this._desktopSettings.connect('changed', Lang.bind(this, this._update));
-        this._weekStart = Shell.util_get_week_start();
+
+        this._eventsSection = new EventsSection();
+        layout.attach(this._eventsSection.actor, 0, 0, 1, 1);
     },
 
     setEventSource: function(eventSource) {
-        this._eventSource = eventSource;
-        this._eventSource.connect('changed', Lang.bind(this, this._update));
+        this._eventsSection.setEventSource(eventSource);
     },
 
-    _addEvent: function(event, index, periodBegin, periodEnd) {
-        let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
-        let title = _formatEventTime(event, clockFormat, periodBegin, periodEnd);
-
-        let rtl = this.actor.get_text_direction() == Clutter.TextDirection.RTL;
-        if (event.date < periodBegin && !event.allDay) {
-            if (rtl)
-                title = title + ELLIPSIS_CHAR;
-            else
-                title = ELLIPSIS_CHAR + title;
-        }
-        if (event.end > periodEnd && !event.allDay) {
-            if (rtl)
-                title = ELLIPSIS_CHAR + title;
-            else
-                title = title + ELLIPSIS_CHAR;
-        }
-        let eventEntry = new EventEntry(title, event.summary);
-
-        let layout = this.actor.layout_manager;
-        layout.attach(eventEntry.actor, 0, index, 1, 1);
-    },
-
-    _addPeriod: function(header, periodBegin, periodEnd) {
-        let events = this._eventSource.getEvents(periodBegin, periodEnd);
-
-        if (events.length == 0)
-            return;
-
-        let label = new St.Label({ style_class: 'events-day-header', text: header });
-        let layout = this.actor.layout_manager;
-        layout.attach(label, 0, 0, 3, 1);
-
-        for (let n = 0; n < events.length; n++)
-            this._addEvent(events[n], n + 1, periodBegin, periodEnd);
-    },
-
-    _showOtherDay: function(day) {
-        this.actor.destroy_all_children();
-
-        let dayBegin = _getBeginningOfDay(day);
-        let dayEnd = _getEndOfDay(day);
-
-        let dayFormat;
-        let now = new Date();
-        if (_sameYear(day, now))
-            /* Translators: Shown on calendar heading when selected day occurs on current year */
-            dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
-                                                             "%A, %B %d"));
-        else
-            /* Translators: Shown on calendar heading when selected day occurs on different year */
-            dayFormat = Shell.util_translate_time_string(NC_("calendar heading",
-                                                             "%A, %B %d, %Y"));
-        let dayString = day.toLocaleFormat(dayFormat);
-        this._addPeriod(dayString, dayBegin, dayEnd);
-    },
-
-    _showToday: function() {
-        this.actor.destroy_all_children();
-
-        let now = new Date();
-        let dayBegin = _getBeginningOfDay(now);
-        let dayEnd = _getEndOfDay(now);
-        this._addPeriod(_("Events"), dayBegin, dayEnd);
-    },
-
-    // Sets the event list to show events from a specific date
     setDate: function(date) {
-        if (!_sameDay(date, this._date)) {
-            this._date = date;
-            this._update();
-        }
-    },
-
-    _update: function() {
-        if (this._eventSource.isLoading)
-            return;
-
-        let today = new Date();
-        if (_sameDay (this._date, today)) {
-            this._showToday();
-        } else {
-            this._showOtherDay(this._date);
-        }
+        this._eventsSection.setDate(date);
     }
 });
