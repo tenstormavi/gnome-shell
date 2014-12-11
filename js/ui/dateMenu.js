@@ -114,7 +114,7 @@ const DateMenuButton = new Lang.Class({
         vbox = new St.BoxLayout({vertical: true});
         hbox.add(vbox);
 
-        this._eventList = new Calendar.EventsList();
+        this._messageList = new Calendar.MessageList();
         this._calendar = new Calendar.Calendar();
 
         // Date
@@ -123,11 +123,11 @@ const DateMenuButton = new Lang.Class({
 
         this._calendar.connect('selected-date-changed',
                                Lang.bind(this, function(calendar, date) {
-                                  // we know this._eventList is defined here, because selected-data-changed
+                                  // we know this._messageList is defined here, because selected-data-changed
                                   // only gets emitted when the user clicks a date in the calendar,
                                   // and the calender makes those dates unclickable when instantiated with
                                   // a null event source
-                                   this._eventList.setDate(date);
+                                   this._messageList.setDate(date);
                                }));
         vbox.add(this._calendar.actor);
 
@@ -158,7 +158,7 @@ const DateMenuButton = new Lang.Class({
         hbox.add(this._separator);
 
         // Fill up the second column
-        hbox.add(this._eventList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
+        hbox.add(this._messageList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
 
         // Whenever the menu is opened, select today
         this.menu.connect('open-state-changed', Lang.bind(this, function(menu, isOpen) {
@@ -190,7 +190,7 @@ const DateMenuButton = new Lang.Class({
         this._openClocksItem.actor.visible = visible &&
             (this._getClockApp() != null);
         this._separator.visible = visible;
-        this._eventList.actor.visible = visible;
+        this._messageList.actor.visible = visible;
         if (visible) {
             let alignment = 0.25;
             if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
@@ -210,7 +210,7 @@ const DateMenuButton = new Lang.Class({
             this._eventSource.destroy();
 
         this._calendar.setEventSource(eventSource);
-        this._eventList.setEventSource(eventSource);
+        this._messageList.setEventSource(eventSource);
 
         this._eventSource = eventSource;
         this._eventSource.connect('notify::has-calendars', Lang.bind(this, function() {

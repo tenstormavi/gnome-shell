@@ -886,17 +886,40 @@ const EventsSection = new Lang.Class({
     }
 });
 
-const EventsList = new Lang.Class({
-    Name: 'EventsList',
+const MessageList = new Lang.Class({
+    Name: 'MessageList',
 
     _init: function() {
-        let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
         this.actor = new St.Widget({ style_class: 'events-table',
-                                     layout_manager: layout });
-        layout.hookup_style(this.actor);
+                                     layout_manager: new Clutter.BinLayout(),
+                                     x_expand: true, y_expand: true });
+
+        this._placeholder = new St.Icon({ icon_name: 'window-close-symbolic' });
+        this.actor.add_actor(this._placeholder);
+
+        this._scrollView = new St.ScrollView({ x_expand: true, y_expand: true,
+                                               y_align: Clutter.ActorAlign.START });
+        this.actor.add_actor(this._scrollView);
+
+        this._sectionList = new St.BoxLayout({ vertical: true });
+        this._scrollView.add_actor(this._sectionList);
 
         this._eventsSection = new EventsSection();
-        layout.attach(this._eventsSection.actor, 0, 0, 1, 1);
+        this._addSection(this._eventsSection);
+
+        this._sync();
+    },
+
+    _addSection: function(section) {
+        let id = section.actor.connect('notify::visible', Lang.bind(this, this._sync));
+        section.actor.connect('destroy', function(a) { a.disconnect(id); });
+        this._sectionList.add_actor(section.actor);
+    },
+
+    _sync: function() {
+        let visible = this._sectionList.get_children().some(function(a) { return a.visible });
+        this._scrollView.visible = visible;
+        this._placeholder.visible = !visible;
     },
 
     setEventSource: function(eventSource) {
