@@ -198,6 +198,10 @@ const AppMenuButton = new Lang.Class({
                              Lang.bind(this, this._onIconThemeChanged));
 
         this._iconBox = new Shell.Slicer({ name: 'appMenuIcon' });
+        this._iconBox.connect('style-changed',
+                              Lang.bind(this, this._onIconBoxStyleChanged));
+        this._iconBox.connect('notify::allocation',
+                              Lang.bind(this, this._updateIconBoxClip));
         this._container.add_actor(this._iconBox);
 
         this._label = new TextShadower();
@@ -205,6 +209,8 @@ const AppMenuButton = new Lang.Class({
         this._container.add_actor(this._label.actor);
         this._arrow = PopupMenu.arrowIcon(St.Side.BOTTOM);
         this._container.add_actor(this._arrow);
+
+        this._iconBottomClip = 0;
 
         this._visible = !Main.overview.visible;
         if (!this._visible)
@@ -270,11 +276,17 @@ const AppMenuButton = new Lang.Class({
         this._spinner.actor.hide();
     },
 
+    _onIconBoxStyleChanged: function() {
+        let node = this._iconBox.get_theme_node();
+        this._iconBottomClip = node.get_length('app-icon-bottom-clip');
+        this._updateIconBoxClip();
+    },
+
     _syncIcon: function() {
         if (!this._targetApp)
             return;
 
-        let icon = this._targetApp.create_icon_texture(PANEL_ICON_SIZE);
+        let icon = this._targetApp.create_icon_texture(PANEL_ICON_SIZE - 2);
         this._iconBox.set_child(icon);
     },
 
@@ -283,6 +295,16 @@ const AppMenuButton = new Lang.Class({
             return;
 
         this._syncIcon();
+    },
+
+    _updateIconBoxClip: function() {
+        let allocation = this._iconBox.allocation;
+        if (this._iconBottomClip > 0)
+            this._iconBox.set_clip(0, 0,
+                                   allocation.x2 - allocation.x1,
+                                   allocation.y2 - allocation.y1 - this._iconBottomClip);
+        else
+            this._iconBox.remove_clip();
     },
 
     stopAnimation: function() {
