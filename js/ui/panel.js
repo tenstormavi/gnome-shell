@@ -286,7 +286,7 @@ const AppMenuButton = new Lang.Class({
         if (!this._targetApp)
             return;
 
-        let icon = this._targetApp.create_icon_texture(2 * PANEL_ICON_SIZE);
+        let icon = this._targetApp.create_icon_texture(PANEL_ICON_SIZE - 2);
         this._iconBox.set_child(icon);
     },
 
