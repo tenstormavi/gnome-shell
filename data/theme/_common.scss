@@ -483,6 +483,7 @@ StScrollBar {
 
     #appMenuIcon { 
       app-icon-bottom-clip: 1px;
+      -st-icon-style: symbolic;
       
       .panel-button:active &, 
       .panel-button:overview &, 
