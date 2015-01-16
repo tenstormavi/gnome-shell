@@ -334,10 +334,10 @@ const FdoNotificationDaemon = new Lang.Class({
         let button = new St.Button({ can_focus: true });
         let iconName = id.endsWith('-symbolic') ? id : id + '-symbolic';
         if (useActionIcons && Gtk.IconTheme.get_default().has_icon(iconName)) {
-            button.add_style_class_name('notification-icon-button');
+            button.add_style_class_name('notification-icon-button button');
             button.child = new St.Icon({ icon_name: iconName });
         } else {
-            button.add_style_class_name('notification-button');
+            button.add_style_class_name('notification-button button');
             button.label = label;
         }
         return button;
