@@ -417,7 +417,7 @@ const AutorunResidentNotification = new Lang.Class({
                           style_class: 'hotplug-resident-eject-icon' });
 
         let ejectButton =
-            new St.Button({ style_class: 'hotplug-resident-eject-button',
+            new St.Button({ style_class: 'hotplug-resident-eject-button button',
                             button_mask: St.ButtonMask.ONE,
                             child: ejectIcon });
         item.add(ejectButton, { x_align: St.Align.END });
@@ -601,7 +601,7 @@ const AutorunTransientNotification = new Lang.Class({
                                      x_fill: true,
                                      x_align: St.Align.START,
                                      button_mask: St.ButtonMask.ONE,
-                                     style_class: 'hotplug-notification-item' });
+                                     style_class: 'hotplug-notification-item button' });
 
         button.connect('clicked', Lang.bind(this, function() {
             startAppForMount(app, this._mount);
@@ -627,7 +627,7 @@ const AutorunTransientNotification = new Lang.Class({
                                      x_fill: true,
                                      x_align: St.Align.START,
                                      button_mask: St.ButtonMask.ONE,
-                                     style_class: 'hotplug-notification-item' });
+                                     style_class: 'hotplug-notification-item button' });
 
         button.connect('clicked', Lang.bind(this, function() {
             this._manager.ejectMount(this._mount);
