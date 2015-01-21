@@ -92,6 +92,7 @@ const PopupBaseMenuItem = new Lang.Class({
 
         if (this._activatable) {
             this.actor.connect('button-release-event', Lang.bind(this, this._onButtonReleaseEvent));
+            this.actor.connect('button-press-event', Lang.bind(this, this._onButtonPressEvent));
             this.actor.connect('touch-event', Lang.bind(this, this._onTouchEvent));
             this.actor.connect('key-press-event', Lang.bind(this, this._onKeyPressEvent));
         }
@@ -119,6 +120,10 @@ const PopupBaseMenuItem = new Lang.Class({
         return Clutter.EVENT_STOP;
     },
 
+    _onButtonPressEvent: function (actor, event) {
+        return Clutter.EVENT_PROPAGATE;
+    },
+
     _onTouchEvent: function (actor, event) {
         if (event.type() == Clutter.EventType.TOUCH_END) {
             this.activate(event);
@@ -138,15 +143,24 @@ const PopupBaseMenuItem = new Lang.Class({
     },
 
     _onKeyFocusIn: function (actor) {
-        this.setActive(true);
+        this._setHover(true);
     },
 
     _onKeyFocusOut: function (actor) {
-        this.setActive(false);
+        this._setHover(false);
     },
 
     _onHoverChanged: function (actor) {
-        this.setActive(actor.hover);
+        this._setHover(actor.hover);
+    },
+
+    _setHover: function (active) {
+        if (active) {
+            this.actor.add_style_pseudo_class('hover');
+            this.actor.grab_key_focus();
+        } else {
+            this.actor.remove_style_pseudo_class('hover');
+        }
     },
 
     activate: function (event) {
@@ -158,10 +172,10 @@ const PopupBaseMenuItem = new Lang.Class({
         if (activeChanged) {
             this.active = active;
             if (active) {
-                this.actor.add_style_pseudo_class('active');
+                this.actor.add_style_pseudo_class('hover');
                 this.actor.grab_key_focus();
             } else {
-                this.actor.remove_style_pseudo_class('active');
+                this.actor.remove_style_pseudo_class('hover');
             }
             this.emit('active-changed', active);
         }
@@ -1126,6 +1140,12 @@ const PopupSubMenuMenuItem = new Lang.Class({
 
     _onButtonReleaseEvent: function(actor) {
         this._setOpenState(!this._getOpenState());
+        this.actor.remove_style_pseudo_class('active');
+        return Clutter.EVENT_PROPAGATE;
+    },
+
+    _onButtonPressEvent: function(actor) {
+        this.actor.add_style_pseudo_class('active');
         return Clutter.EVENT_PROPAGATE;
     }
 });
