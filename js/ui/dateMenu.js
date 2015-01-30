@@ -110,11 +110,27 @@ const DateMenuButton = new Lang.Class({
         this.menu.box.add_child(hbox);
 
         // Fill up the first column
+        this._messageList = new Calendar.MessageList();
+        hbox.add(this._messageList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
 
+        // Whenever the menu is opened, select today
+        this.menu.connect('open-state-changed', Lang.bind(this, function(menu, isOpen) {
+            if (isOpen) {
+                let now = new Date();
+                this._calendar.setDate(now);
+                this._date.setDate(now);
+            }
+        }));
+
+        this._separator = new St.DrawingArea({ style_class: 'calendar-vertical-separator',
+                                               pseudo_class: 'highlighted' });
+        this._separator.connect('repaint', Lang.bind(this, _onVertSepRepaint));
+        hbox.add(this._separator);
+
+        // Fill up the second column
         vbox = new St.BoxLayout({vertical: true});
         hbox.add(vbox);
 
-        this._messageList = new Calendar.MessageList();
         this._calendar = new Calendar.Calendar();
 
         // Date
@@ -152,22 +168,6 @@ const DateMenuButton = new Lang.Class({
             this._dateAndTimeSeparator = separator;
         }
 
-        this._separator = new St.DrawingArea({ style_class: 'calendar-vertical-separator',
-                                               pseudo_class: 'highlighted' });
-        this._separator.connect('repaint', Lang.bind(this, _onVertSepRepaint));
-        hbox.add(this._separator);
-
-        // Fill up the second column
-        hbox.add(this._messageList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
-
-        // Whenever the menu is opened, select today
-        this.menu.connect('open-state-changed', Lang.bind(this, function(menu, isOpen) {
-            if (isOpen) {
-                let now = new Date();
-                this._calendar.setDate(now);
-                this._date.setDate(now);
-            }
-        }));
 
         // Done with hbox for calendar and event list
 
