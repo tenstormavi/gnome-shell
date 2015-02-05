@@ -1531,6 +1531,10 @@ StScrollBar StButton#vhandle:active {
     padding-right: 8pt;
 }
 
+.message-list-section {
+    spacing: 6px;
+}
+
 .message-list-section-list {
     spacing: 6px;
 }
