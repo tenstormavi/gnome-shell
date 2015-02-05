@@ -101,7 +101,7 @@ const NotificationsBox = new Lang.Class({
     _init: function() {
         this.actor = new St.BoxLayout({ vertical: true,
                                         name: 'screenShieldNotifications',
-                                        style_class: 'screen-shield-notifications-box' });
+                                        style_class: 'screen-shield-notifications-container' });
 
         this._musicBin = new St.Bin({ style_class: 'screen-shield-notifications-box',
                                       visible: false });
