@@ -808,7 +808,11 @@ const EventsSection = new Lang.Class({
         this._desktopSettings.connect('changed', Lang.bind(this, this._reloadEvents));
         this._eventSource = new EmptyEventSource();
 
-        this.parent('', null);
+        this.parent('', Lang.bind(this, this._openCalendar));
+
+        Shell.AppSystem.get_default().connect('installed-changed',
+                                              Lang.bind(this, this._appInstalledChanged));
+        this._appInstalledChanged();
     },
 
     setEventSource: function(eventSource) {
@@ -869,6 +873,33 @@ const EventsSection = new Lang.Class({
             let eventEntry = new EventEntry(title, event.summary);
             this._list.add(eventEntry.actor);
         }
+    },
+
+    _appInstalledChanged: function() {
+        this._calendarApp = undefined;
+        this._title.reactive = (this._getCalendarApp() != null);
+    },
+
+    _getCalendarApp: function() {
+        if (this._calendarApp !== undefined)
+            return this._calendarApp;
+
+        let apps = Gio.AppInfo.get_recommended_for_type('text/calendar');
+        if (apps && (apps.length > 0)) {
+            let app = Gio.AppInfo.get_default_for_type('text/calendar', false);
+            let defaultInRecommended = apps.some(function(a) { return a.equal(app); });
+            this._calendarApp = defaultInRecommended ? app : apps[0];
+        } else {
+            this._calendarApp = null;
+        }
+        return this._calendarApp;
+    },
+
+    _openCalendar: function() {
+        let app = this._getCalendarApp();
+        if (app.get_id() == 'evolution.desktop')
+            app = Gio.DesktopAppInfo.new('evolution-calendar.desktop');
+        app.launch([], global.create_app_launch_context(0, -1));
     },
 
     setDate: function(date) {
