@@ -184,21 +184,10 @@ const DateMenuButton = new Lang.Class({
     },
 
     _updateEventsVisibility: function() {
-        let visible = this._eventSource.hasCalendars;
-        this._openCalendarItem.actor.visible = visible &&
+        this._openCalendarItem.actor.visible =
             (this._getCalendarApp() != null);
-        this._openClocksItem.actor.visible = visible &&
+        this._openClocksItem.actor.visible =
             (this._getClockApp() != null);
-        this._separator.visible = visible;
-        this._messageList.actor.visible = visible;
-        if (visible) {
-            let alignment = 0.25;
-            if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
-                alignment = 1.0 - alignment;
-            this.menu._arrowAlignment = alignment;
-        } else {
-            this.menu._arrowAlignment = 0.5;
-        }
     },
 
     _getEventSource: function() {
