@@ -1535,6 +1535,19 @@ StScrollBar StButton#vhandle:active {
     spacing: 6px;
 }
 
+.message-list-section-title-box {
+    spacing: 6px;
+}
+
+.message-list-section-title {
+    padding: 2px;
+    border-radius: 4px;
+}
+
+.message-list-section-title:hover {
+    background-color: #999999;
+}
+
 .message-list-section-list {
     spacing: 6px;
 }
