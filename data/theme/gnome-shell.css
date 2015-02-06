@@ -1365,6 +1365,20 @@ StScrollBar StButton#vhandle:active {
     background-color: #aaaaaa;
 }
 
+.world-clocks-button {
+    border-radius: 4px;
+    margin: 6px;
+}
+
+.world-clocks-button:hover,
+.world-clocks-button:focus {
+    background-color: #999999;
+}
+
+.world-clocks-header {
+    color: #888a85;
+}
+
 .datemenu-today-button {
     padding: .4em 1.7em;
     color: #eeeeec;
