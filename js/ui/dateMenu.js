@@ -4,6 +4,7 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const GnomeDesktop = imports.gi.GnomeDesktop;
 const GObject = imports.gi.GObject;
+const GWeather = imports.gi.GWeather;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
 const Cairo = imports.cairo;
@@ -87,6 +88,135 @@ const TodayButton = new Lang.Class({
     }
 });
 
+const WorldClocksSection = new Lang.Class({
+    Name: 'WorldClocksSection',
+
+    _init: function() {
+        this._clock = new GnomeDesktop.WallClock();
+        this._settings = null;
+        this._clockNotifyId = 0;
+        this._changedId = 0;
+
+        this._locations = [];
+
+        this.actor = new St.Button({ style_class: 'world-clocks-button',
+                                     x_fill: true });
+        this.actor.connect('clicked', Lang.bind(this,
+            function() {
+                let app = this._getClockApp();
+                app.activate();
+            }));
+
+        let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
+        this._grid = new St.Widget({ style_class: 'world-clocks-grid',
+                                     layout_manager: layout });
+        layout.hookup_style(this._grid);
+
+        this.actor.child = this._grid;
+
+        Shell.AppSystem.get_default().connect('installed-changed',
+                                              Lang.bind(this, this._sync));
+        this._sync();
+    },
+
+    _getClockApp: function() {
+        return Shell.AppSystem.get_default().lookup_app('org.gnome.clocks.desktop');
+    },
+
+    _sync: function() {
+        this.actor.visible = (this._getClockApp() != null);
+
+        if (this.actor.visible) {
+            if (!this._settings) {
+                this._settings = new Gio.Settings({ schema_id: 'org.gnome.clocks' });
+                this._changedId =
+                    this._settings.connect('changed::world-clocks',
+                                           Lang.bind(this, this._clocksChanged));
+                this._clocksChanged();
+            }
+        } else {
+            if (this._settings)
+                this._settings.disconnect(this._changedId);
+            this._settings = null;
+            this._changedId = 0;
+        }
+    },
+
+    _clocksChanged: function() {
+        this._grid.destroy_all_children();
+        this._locations = [];
+
+        let world = GWeather.Location.get_world();
+        let clocks = this._settings.get_value('world-clocks').deep_unpack();
+        for (let i = 0; i < clocks.length; i++) {
+            let l = world.deserialize(clocks[i].location);
+            this._locations.push({ location: l });
+        }
+
+        this._locations.sort(function(a, b) {
+            let aCity = a.location.get_city_name();
+            let bCity = b.location.get_city_name();
+            return aCity.localeCompare(bCity);
+        });
+
+        let layout = this._grid.layout_manager;
+        let title = (this._locations.length == 0) ? _("Add world clocks...")
+                                                  : _("World clocks");
+        let header = new St.Label({ style_class: 'world-clocks-header',
+                                    text: title });
+        layout.attach(header, 0, 0, 2, 1);
+
+        for (let i = 0; i < this._locations.length; i++) {
+            let l = this._locations[i].location;
+
+            let label = new St.Label({ style_class: 'world-clocks-city',
+                                       text: l.get_city_name(),
+                                       x_align: Clutter.ActorAlign.START,
+                                       x_expand: true });
+            layout.attach(label, 0, i + 1, 1, 1);
+
+            let time = new St.Label({ style_class: 'world-clocks-time',
+                                      x_align: Clutter.ActorAlign.END,
+                                      x_expand: true });
+            layout.attach(time, 1, i + 1, 1, 1);
+
+            this._locations[i].actor = time;
+        }
+
+        if (this._grid.get_n_children() > 1) {
+            if (!this._clockNotifyId)
+                this._clockNotifyId =
+                    this._clock.connect('notify::clock', Lang.bind(this, this._updateLabels));
+            this._updateLabels();
+        } else {
+            if (this._clockNotifyId)
+                this._clock.disconnect(this._clockNotifyId);
+            this._clockNotifyId = 0;
+        }
+    },
+
+    _updateLabels: function() {
+        let desktopSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
+        let clockFormat = desktopSettings.get_string('clock-format');
+        let hasAmPm = new Date().toLocaleFormat('%p') != '';
+
+        let format;
+        if (clockFormat == '24h' || !hasAmPm)
+            /* Translators: Time in 24h format */
+            format = N_("%H\u2236%M");
+        else
+            /* Translators: Time in 12h format */
+            format = N_("%l\u2236%M %p");
+
+        for (let i = 0; i < this._locations.length; i++) {
+            let l = this._locations[i];
+            let tz = GLib.TimeZone.new(l.location.get_timezone().get_tzid());
+            let now = GLib.DateTime.new_now(tz);
+            l.actor.text = now.format(format);
+        }
+    }
+});
+
 const DateMenuButton = new Lang.Class({
     Name: 'DateMenuButton',
     Extends: PanelMenu.Button,
@@ -147,15 +277,11 @@ const DateMenuButton = new Lang.Class({
                                }));
         vbox.add(this._calendar.actor);
 
+        this._clocksItem = new WorldClocksSection();
+        vbox.add(this._clocksItem.actor);
+
         let separator = new PopupMenu.PopupSeparatorMenuItem();
         vbox.add(separator.actor, { y_align: St.Align.END, expand: true, y_fill: false });
-
-        this._openClocksItem = new PopupMenu.PopupMenuItem(_("Open Clocks"));
-        this._openClocksItem.connect('activate', Lang.bind(this, this._onOpenClocksActivate));
-        vbox.add(this._openClocksItem.actor, {y_align: St.Align.END, expand: true, y_fill: false});
-
-        Shell.AppSystem.get_default().connect('installed-changed',
-                                              Lang.bind(this, this._updateEventsVisibility));
 
         item = this.menu.addSettingsAction(_("Date & Time Settings"), 'gnome-datetime-panel.desktop');
         if (item) {
@@ -175,8 +301,6 @@ const DateMenuButton = new Lang.Class({
     },
 
     _updateEventsVisibility: function() {
-        this._openClocksItem.actor.visible =
-            (this._getClockApp() != null);
     },
 
     _getEventSource: function() {
@@ -210,15 +334,5 @@ const DateMenuButton = new Lang.Class({
         // This needs to be handled manually, as the code to
         // autohide separators doesn't work across the vbox
         this._dateAndTimeSeparator.actor.visible = Main.sessionMode.allowSettings;
-    },
-
-    _getClockApp: function() {
-        return Shell.AppSystem.get_default().lookup_app('org.gnome.clocks.desktop');
-    },
-
-    _onOpenClocksActivate: function() {
-        this.menu.close();
-        let app = this._getClockApp();
-        app.activate();
     }
 });
