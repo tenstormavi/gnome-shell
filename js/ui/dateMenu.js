@@ -280,16 +280,6 @@ const DateMenuButton = new Lang.Class({
         this._clocksItem = new WorldClocksSection();
         vbox.add(this._clocksItem.actor);
 
-        let separator = new PopupMenu.PopupSeparatorMenuItem();
-        vbox.add(separator.actor, { y_align: St.Align.END, expand: true, y_fill: false });
-
-        item = this.menu.addSettingsAction(_("Date & Time Settings"), 'gnome-datetime-panel.desktop');
-        if (item) {
-            item.actor.show_on_set_parent = false;
-            item.actor.reparent(vbox);
-            this._dateAndTimeSeparator = separator;
-        }
-
 
         // Done with hbox for calendar and event list
 
@@ -330,9 +320,5 @@ const DateMenuButton = new Lang.Class({
         }
         this._setEventSource(eventSource);
         this._updateEventsVisibility();
-
-        // This needs to be handled manually, as the code to
-        // autohide separators doesn't work across the vbox
-        this._dateAndTimeSeparator.actor.visible = Main.sessionMode.allowSettings;
     }
 });
