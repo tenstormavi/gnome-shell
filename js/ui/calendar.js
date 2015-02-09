@@ -687,30 +687,35 @@ const Calendar = new Lang.Class({
 
 Signals.addSignalMethods(Calendar.prototype);
 
-const EventEntry = new Lang.Class({
-    Name: 'EventEntry',
+const MessageListEntry = new Lang.Class({
+    Name: 'MessageListEntry',
 
     _init: function(title, body, params) {
         params = Params.parse(params, { gicon: null,
                                         time: null });
 
         let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
-        this.actor = new St.Button({ child: new St.Widget({ layout_manager: layout }),
+        this.actor = new St.Button({ child: new St.Widget({ style_class: 'event-grid',
+                                                            layout_manager: layout }),
                                      style_class: 'event-button',
                                      x_expand: true, x_fill: true });
+        layout.hookup_style(this.actor.child);
 
-        this._icon = new St.Icon({ gicon: params.gicon });
+        this._icon = new St.Icon({ gicon: params.gicon,
+                                   y_align: Clutter.ActorAlign.START });
         layout.attach(this._icon, 0, 0, 1, 2);
 
         this._title = new St.Label({ style_class: 'event-title',
                                      text: title,
                                      x_expand: true });
         this._title.clutter_text.line_wrap = false;
-        this._title.clutter_text.ellipsize = true;
+        this._title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         layout.attach(this._title, 1, 0, 1, 1);
 
         this._time = new St.Label({ style_class: 'event-time',
                                     x_align: Clutter.ActorAlign.END });
+        if (params.time)
+            this._time.text = params.time.toLocaleFormat(C_("event list time", "%H\u2236%M"));
         layout.attach(this._time, 2, 0, 1, 1);
 
         let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
@@ -721,7 +726,7 @@ const EventEntry = new Lang.Class({
         this._body = new St.Label({ style_class: 'event-body', text: body,
                                     x_expand: true });
         this._body.clutter_text.line_wrap = false;
-        this._body.clutter_text.ellipsize = true;
+        this._body.clutter_text.ellipsize = Pango.EllipsizeMode.END;
         layout.attach(this._body, 1, 1, 3, 1);
 
         this._closeButton.connect('clicked', Lang.bind(this,
@@ -870,7 +875,7 @@ const EventsSection = new Lang.Class({
                 else
                     title = title + ELLIPSIS_CHAR;
             }
-            let eventEntry = new EventEntry(title, event.summary);
+            let eventEntry = new MessageListEntry(title, event.summary);
             this._list.add(eventEntry.actor);
         }
     },
