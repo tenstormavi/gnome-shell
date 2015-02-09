@@ -170,6 +170,7 @@ const Monitor = new Lang.Class({
 const defaultParams = {
     trackFullscreen: false,
     affectsStruts: false,
+    affectsInputRegion: true
 };
 
 const LayoutManager = new Lang.Class({
@@ -783,10 +784,11 @@ const LayoutManager = new Lang.Class({
     // @actor: an actor to add to the chrome
     // @params: (optional) additional params
     //
-    // Adds @actor to the chrome, and extends the input region
-    // to include it. Changes in @actor's size, position, and
-    // visibility will automatically result in appropriate changes
-    // to the input region.
+    // Adds @actor to the chrome, and (unless %affectsInputRegion in
+    // @params is %false) extends the input region to include it.
+    // Changes in @actor's size, position, and visibility will
+    // automatically result in appropriate changes to the input
+    // region.
     //
     // If %affectsStruts in @params is %true (and @actor is along a
     // screen edge), then @actor's size and position will also affect
@@ -988,7 +990,7 @@ const LayoutManager = new Lang.Class({
 
         for (i = 0; i < this._trackedActors.length; i++) {
             let actorData = this._trackedActors[i];
-            if (!wantsInputRegion && !actorData.affectsStruts)
+            if (!(actorData.affectsInputRegion && wantsInputRegion) && !actorData.affectsStruts)
                 continue;
 
             let [x, y] = actorData.actor.get_transformed_position();
@@ -998,7 +1000,7 @@ const LayoutManager = new Lang.Class({
             w = Math.round(w);
             h = Math.round(h);
 
-            if (wantsInputRegion && actorData.actor.get_paint_visibility())
+            if (actorData.affectsInputRegion && wantsInputRegion && actorData.actor.get_paint_visibility())
                 rects.push(new Meta.Rectangle({ x: x, y: y, width: w, height: h }));
 
             if (actorData.affectsStruts) {
