@@ -687,6 +687,210 @@ const Calendar = new Lang.Class({
 
 Signals.addSignalMethods(Calendar.prototype);
 
+const Source = new Lang.Class({
+    Name: 'MessageListSource',
+
+    SOURCE_ICON_SIZE: 48,
+
+    _init: function(title, iconName) {
+        this.title = title;
+        this.iconName = iconName;
+
+        this.isChat = false;
+        this.isMuted = false;
+        this.keepTrayOnSummaryClick = false;
+
+        this.notifications = [];
+
+        this.policy = this._createPolicy();
+    },
+
+    get count() {
+        return this.notifications.length;
+    },
+
+    get indicatorCount() {
+        let notifications = this.notifications.filter(function(n) { return !n.isTransient && !n.resident; });
+        return notifications.length;
+    },
+
+    get unseenCount() {
+        return this.notifications.filter(function(n) { return !n.acknowledged; }).length;
+    },
+
+    get countVisible() {
+        return this.count > 1;
+    },
+
+    get isClearable() {
+        return !this.isChat && !this.resident;
+    },
+
+    countUpdated: function() {
+        this.emit('count-updated');
+    },
+
+    _createPolicy: function() {
+        return new NotificationPolicy();
+    },
+
+    buildRightClickMenu: function() {
+        let item;
+        let rightClickMenu = new St.BoxLayout({ name: 'summary-right-click-menu',
+                                                vertical: true });
+
+        item = new PopupMenu.PopupMenuItem(_("Open"));
+        item.connect('activate', Lang.bind(this, function() {
+            this.open();
+            this.emit('done-displaying-content', true);
+        }));
+        rightClickMenu.add(item.actor);
+
+        item = new PopupMenu.PopupMenuItem(_("Remove"));
+        item.connect('activate', Lang.bind(this, function() {
+            this.destroy();
+            this.emit('done-displaying-content', false);
+        }));
+        rightClickMenu.add(item.actor);
+        return rightClickMenu;
+    },
+
+    setTitle: function(newTitle) {
+        this.title = newTitle;
+        this.emit('title-changed');
+    },
+
+    setMuted: function(muted) {
+        if (!this.isChat || this.isMuted == muted)
+            return;
+        this.isMuted = muted;
+        this.emit('muted-changed');
+    },
+
+    // Called to create a new icon actor.
+    // Provides a sane default implementation, override if you need
+    // something more fancy.
+    createIcon: function(size) {
+        return new St.Icon({ gicon: this.getIcon(),
+                             icon_size: size });
+    },
+
+    getIcon: function() {
+        return new Gio.ThemedIcon({ name: this.iconName });
+    },
+
+    _ensureMainIcon: function() {
+        if (this._mainIcon)
+            return;
+
+        this._mainIcon = new SourceActorWithLabel(this, this.SOURCE_ICON_SIZE);
+    },
+
+    // Unlike createIcon, this always returns the same actor;
+    // there is only one summary icon actor for a Source.
+    getSummaryIcon: function() {
+        this._ensureMainIcon();
+        return this._mainIcon.actor;
+    },
+
+    _onNotificationDestroy: function(notification) {
+        let index = this.notifications.indexOf(notification);
+        if (index < 0)
+            return;
+
+        this.notifications.splice(index, 1);
+        if (this.notifications.length == 0)
+            this._lastNotificationRemoved();
+
+        this.countUpdated();
+    },
+
+    pushNotification: function(notification) {
+        if (this.notifications.indexOf(notification) >= 0)
+            return;
+
+        notification.connect('destroy', Lang.bind(this, this._onNotificationDestroy));
+        this.notifications.push(notification);
+        this.emit('notification-added', notification);
+
+        this.countUpdated();
+    },
+
+    notify: function(notification) {
+        notification.acknowledged = false;
+        this.pushNotification(notification);
+
+        if (!this.isMuted) {
+            // Play the sound now, if banners are disabled.
+            // Otherwise, it will be played when the notification
+            // is next shown.
+            if (this.policy.showBanners) {
+                this.emit('notify', notification);
+            } else {
+                notification.playSound();
+            }
+        }
+    },
+
+    destroy: function(reason) {
+        this.policy.destroy();
+
+        let notifications = this.notifications;
+        this.notifications = [];
+
+        for (let i = 0; i < notifications.length; i++)
+            notifications[i].destroy(reason);
+
+        this.emit('destroy', reason);
+    },
+
+    // A subclass can redefine this to "steal" clicks from the
+    // summaryitem; Use Clutter.get_current_event() to get the
+    // details, return true to prevent the default handling from
+    // ocurring.
+    handleSummaryClick: function() {
+        return false;
+    },
+
+    iconUpdated: function() {
+        this.emit('icon-updated');
+    },
+
+    //// Protected methods ////
+    _setSummaryIcon: function(icon) {
+        this._ensureMainIcon();
+        this._mainIcon.setIcon(icon);
+        this.iconUpdated();
+    },
+
+    // To be overridden by subclasses
+    open: function() {
+    },
+
+    destroyNonResidentNotifications: function() {
+        for (let i = this.notifications.length - 1; i >= 0; i--)
+            if (!this.notifications[i].resident)
+                this.notifications[i].destroy();
+
+        this.countUpdated();
+    },
+
+    // Default implementation is to destroy this source, but subclasses can override
+    _lastNotificationRemoved: function() {
+        this.destroy();
+    },
+
+    getMusicNotification: function() {
+        for (let i = 0; i < this.notifications.length; i++) {
+            if (this.notifications[i].isMusic)
+                return this.notifications[i];
+        }
+
+        return null;
+    },
+});
+Signals.addSignalMethods(Source.prototype);
+
 const MessageListEntry = new Lang.Class({
     Name: 'MessageListEntry',
 
