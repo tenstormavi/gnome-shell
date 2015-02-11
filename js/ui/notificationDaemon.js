@@ -10,7 +10,6 @@ const Shell = imports.gi.Shell;
 const Mainloop = imports.mainloop;
 const St = imports.gi.St;
 
-const Calendar = imports.ui.calendar;
 const Config = imports.misc.config;
 const Main = imports.ui.main;
 const MessageTray = imports.ui.messageTray;
@@ -196,6 +195,7 @@ const FdoNotificationDaemon = new Lang.Class({
                 this._sources.splice(index, 1);
         }));
 
+        Main.messageTray.add(source);
         return source;
     },
 
@@ -311,13 +311,26 @@ const FdoNotificationDaemon = new Lang.Class({
         return invocation.return_value(GLib.Variant.new('(u)', [id]));
     },
 
+    _makeButton: function(id, label, useActionIcons) {
+        let button = new St.Button({ can_focus: true });
+        let iconName = id.endsWith('-symbolic') ? id : id + '-symbolic';
+        if (useActionIcons && Gtk.IconTheme.get_default().has_icon(iconName)) {
+            button.add_style_class_name('notification-icon-button');
+            button.child = new St.Icon({ icon_name: iconName });
+        } else {
+            button.add_style_class_name('notification-button');
+            button.label = label;
+        }
+        return button;
+    },
+
     _notifyForSource: function(source, ndata) {
         let [id, icon, summary, body, actions, hints, notification] =
             [ndata.id, ndata.icon, ndata.summary, ndata.body,
              ndata.actions, ndata.hints, ndata.notification];
 
         if (notification == null) {
-            notification = new Calendar.Notification(source);
+            notification = new MessageTray.Notification(source);
             ndata.notification = notification;
             notification.connect('destroy', Lang.bind(this,
                 function(n, reason) {
@@ -355,35 +368,47 @@ const FdoNotificationDaemon = new Lang.Class({
             gicon = this._fallbackIconForNotificationData(hints);
 
         notification.update(summary, body, { gicon: gicon,
+                                             bannerMarkup: true,
+                                             clear: true,
                                              soundFile: hints['sound-file'],
                                              soundName: hints['sound-name'] });
 
         let hasDefaultAction = false;
 
         if (actions.length) {
+            let useActionIcons = (hints['action-icons'] == true);
+
             for (let i = 0; i < actions.length - 1; i += 2) {
                 let [actionId, label] = [actions[i], actions[i+1]];
                 if (actionId == 'default') {
-                    notification.setDefaultAction(Lang.bind(this, function() {
-                        this._emitActionInvoked(ndata.id, 'default');
-                    }));
+                    hasDefaultAction = true;
                 } else {
-                    notification.addButton(label, Lang.bind(this, function() {
+                    notification.addButton(this._makeButton(actionId, label, useActionIcons), Lang.bind(this, function() {
                         this._emitActionInvoked(ndata.id, actionId);
                     }));
                 }
             }
         }
 
+        if (hasDefaultAction) {
+            notification.connect('clicked', Lang.bind(this, function() {
+                this._emitActionInvoked(ndata.id, 'default');
+            }));
+        } else {
+            notification.connect('clicked', Lang.bind(this, function() {
+                source.open();
+            }));
+        }
+
         switch (hints.urgency) {
             case Urgency.LOW:
-                notification.setPriority(Gio.NotificationPriority.LOW);
+                notification.setUrgency(MessageTray.Urgency.LOW);
                 break;
             case Urgency.NORMAL:
-                notification.setPriority(Gio.NotificationPriority.NORMAL);
+                notification.setUrgency(MessageTray.Urgency.NORMAL);
                 break;
             case Urgency.CRITICAL:
-                notification.setPriority(Gio.NotificationPriority.URGENT);
+                notification.setUrgency(MessageTray.Urgency.CRITICAL);
                 break;
         }
         notification.setResident(hints.resident == true);
@@ -391,7 +416,8 @@ const FdoNotificationDaemon = new Lang.Class({
         // of the 'transient' hint with hints['transient'] rather than hints.transient
         notification.setTransient(hints['transient'] == true);
 
-        Main.panel.statusArea.dateMenu._messageList._notificationSection.addNotification(notification);
+        let sourceGIcon = source.useNotificationIcon ? gicon : null;
+        source.processNotification(notification, sourceGIcon);
     },
 
     CloseNotification: function(id) {
@@ -406,7 +432,7 @@ const FdoNotificationDaemon = new Lang.Class({
     GetCapabilities: function() {
         return [
             'actions',
-            // 'action-icons',
+            'action-icons',
             'body',
             // 'body-hyperlinks',
             // 'body-images',
@@ -468,7 +494,7 @@ const FdoNotificationDaemon = new Lang.Class({
 
 const FdoNotificationDaemonSource = new Lang.Class({
     Name: 'FdoNotificationDaemonSource',
-    Extends: Calendar.Source,
+    Extends: MessageTray.Source,
 
     _init: function(title, pid, sender, appId) {
         // Need to set the app before chaining up, so
@@ -513,6 +539,18 @@ const FdoNotificationDaemonSource = new Lang.Class({
             this.destroy();
     },
 
+    processNotification: function(notification, gicon) {
+        if (gicon)
+            this._gicon = gicon;
+        this.iconUpdated();
+
+        let tracker = Shell.WindowTracker.get_default();
+        if (notification.resident && this.app && tracker.focus_app == this.app)
+            this.pushNotification(notification);
+        else
+            this.notify(notification);
+    },
+
     _getApp: function(appId) {
         let app;
 
@@ -541,7 +579,11 @@ const FdoNotificationDaemonSource = new Lang.Class({
 
     open: function() {
         this.openApp();
-        //this.destroyNonResidentNotifications();
+        this.destroyNonResidentNotifications();
+    },
+
+    _lastNotificationRemoved: function() {
+        this.destroy();
     },
 
     openApp: function() {
