@@ -11,11 +11,17 @@ const Gettext_gtk30 = imports.gettext.domain('gtk30');
 const Mainloop = imports.mainloop;
 const Shell = imports.gi.Shell;
 
+const Layout = imports.ui.layout;
+const Main = imports.ui.main;
+const MessageTray = imports.ui.messageTray;
 const Params = imports.misc.params;
+const Tweener = imports.ui.tweener;
 
 const MSECS_IN_DAY = 24 * 60 * 60 * 1000;
 const SHOW_WEEKDATE_KEY = 'show-weekdate';
 const ELLIPSIS_CHAR = '\u2026';
+
+const MAX_NOTIFICATION_BUTTONS = 3;
 
 // alias to prevent xgettext from picking up strings translated in GTK+
 const gtk30_ = Gettext_gtk30.gettext;
@@ -715,6 +721,7 @@ const Source = new Lang.Class({
 
     destroy: function(reason) {
         this.policy.destroy();
+        this.emit('destroy');
     },
 
     //// Protected methods ////
@@ -804,8 +811,8 @@ const Notification = new Lang.Class({
         this.buttons.push({ label: button, callback: callback });
     },
 
-    setDefaultAction(callback) {
-        this._defaultAction = callback;
+    setDefaultAction: function(callback) {
+        this.defaultAction = callback;
     },
 
     setPriority: function(priority) {
@@ -861,6 +868,7 @@ const Notification = new Lang.Class({
     }
 });
 Signals.addSignalMethods(Notification.prototype);
+
 const MessageListEntry = new Lang.Class({
     Name: 'MessageListEntry',
 
@@ -869,10 +877,12 @@ const MessageListEntry = new Lang.Class({
                                         time: null });
 
         let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
-        this.actor = new St.Button({ child: new St.Widget({ style_class: 'event-grid',
-                                                            layout_manager: layout }),
+        this._grid = new St.Widget({ style_class: 'event-grid',
+                                     layout_manager: layout });
+        this.actor = new St.Button({ child: this._grid,
                                      style_class: 'event-button',
-                                     x_expand: true, x_fill: true });
+                                     x_expand: true, x_fill: true,
+                                     can_focus: true });
         layout.hookup_style(this.actor.child);
 
         this._icon = new St.Icon({ gicon: params.gicon,
@@ -905,6 +915,7 @@ const MessageListEntry = new Lang.Class({
 
         this._closeButton.connect('clicked', Lang.bind(this,
             function() {
+                this.emit('close');
                 this.actor.destroy();
             }));
         this.actor.connect('notify::hover', Lang.bind(this, this._sync));
@@ -917,6 +928,7 @@ const MessageListEntry = new Lang.Class({
         this._time.visible = !hovered;
     }
 });
+Signals.addSignalMethods(MessageListEntry.prototype);
 
 const MessageListSection = new Lang.Class({
     Name: 'MessageListSection',
@@ -924,14 +936,15 @@ const MessageListSection = new Lang.Class({
     _init: function(title, callback) {
         this.actor = new St.BoxLayout({ style_class: 'message-list-section',
                                         x_expand: true, vertical: true });
-        let titleBox = new St.BoxLayout();
+        let titleBox = new St.BoxLayout({ style_class: 'message-list-section-title-box' });
         this.actor.add_actor(titleBox);
 
         let hasCallback = typeof callback == 'function';
         this._title = new St.Button({ style_class: 'message-list-section-title',
                                       reactive: hasCallback,
-                                      x_expand: true });
-        this._title.set_x_align(Clutter.ActorAlign.START);
+                                      label: title,
+                                      x_expand: true,
+                                      x_align: St.Align.START });
         titleBox.add_actor(this._title);
 
         let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic' });
@@ -967,14 +980,284 @@ const MessageListSection = new Lang.Class({
         this._list.destroy_all_children();
     },
 
+    isEmpty: function() {
+        return this._list.get_n_children() == 0;
+    },
+
     _shouldShowForDate: function() {
         let today = new Date();
         return _sameDay(this._date, today);
     },
 
     _sync: function() {
-        this.actor.visible = this._list.get_n_children() > 0 &&
-                             this._shouldShowForDate();
+        this.actor.visible = !this.isEmpty() && this._shouldShowForDate();
+    }
+});
+
+const ScaleLayout = new Lang.Class({
+    Name: 'ScaleLayout',
+    Extends: Clutter.BinLayout,
+
+    _connectContainer: function(container) {
+        if (this._container == container)
+            return;
+
+        if (this._container)
+            for (let id of this._signals)
+                this._container.disconnect(id);
+
+        this._container = container;
+        this._signals = [];
+
+        if (this._container)
+            for (let signal of ['notify::scale-x', 'notify::scale-y']) {
+                let id = this._container.connect(signal, Lang.bind(this,
+                    function() {
+                        this.layout_changed();
+                    }));
+                this._signals.push(id);
+            }
+    },
+
+    vfunc_get_preferred_width: function(container, forHeight) {
+        this._connectContainer(container);
+
+        let [min, nat] = this.parent(container, forHeight);
+        return [min * container.scale_x, nat * container.scale_x];
+    },
+
+    vfunc_get_preferred_height: function(container, forWidth) {
+        this._connectContainer(container);
+
+        let [min, nat] = this.parent(container, forWidth);
+        return [min * container.scale_y, nat * container.scale_y];
+    }
+});
+
+const NotificationListEntry = new Lang.Class({
+    Name: 'NotificationListEntry',
+    Extends: MessageListEntry,
+
+    _init: function(notification) {
+        let params = { gicon: notification.icon || notification.getIcon() };
+        if (!this._noDate)
+            params.time = new Date();
+
+        this.parent(notification.title, notification.body, params);
+
+        this.notification = notification;
+
+        this.actor.connect('clicked', Lang.bind(this,
+            function() {
+                if (this.notification.defaultAction)
+                    this.notification.defaultAction();
+                else
+                    this.notification.source.open();
+
+                if (!this.notification.resident)
+                    this.actor.destroy();
+            }));
+        this.connect('close', Lang.bind(this,
+            function() {
+                this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
+            }));
+        this.notification.connect('destroy', Lang.bind(this,
+            function() {
+                this.actor.destroy();
+            }));
+    }
+});
+
+const NotificationBanner = new Lang.Class({
+    Name: 'NotificationBanner',
+    Extends: NotificationListEntry,
+
+    _init: function(notification) {
+        this._noDate = true;
+
+        this.parent(notification);
+
+        this.actor.add_style_class_name('notification-banner');
+
+        this.actor.set_x_expand(false);
+        this.actor.set_y_expand(true);
+        this.actor.set_y_align(Clutter.ActorAlign.START);
+
+        this._expanded = false;
+        this._body.clutter_text.line_wrap = true;
+
+        this._actionBin = new St.Widget({ layout_manager: new ScaleLayout(),
+                                          visible: false });
+        this._grid.layout_manager.attach_next_to(this._actionBin, null,
+                                                 Clutter.GridPosition.BOTTOM, 4, 1);
+
+        for (let button of notification.buttons)
+            this._addButton(button.label, button.callback);
+    },
+
+    _sync: function() {
+        this.parent();
+
+        if (this._expanded !== undefined)
+            this.expanded = this.actor.hover;
+    },
+
+    _addButton: function(label, callback) {
+        let buttonBox = this._actionBin.get_first_child();
+        if (!buttonBox) {
+            buttonBox = new St.BoxLayout({ style_class: 'notification-button-box',
+                                           x_expand: true });
+            this._actionBin.add_actor(buttonBox);
+        }
+
+        if (buttonBox.get_n_children() >= MAX_NOTIFICATION_BUTTONS)
+            return;
+
+        let button = new St.Button({ label: label,
+                                     style_class: 'notification-button',
+                                     x_expand: true });
+        button.connect('clicked', Lang.bind(this,
+            function() {
+                callback();
+
+                this.actor.destroy();
+            }));
+        buttonBox.add_actor(button);
+    },
+
+    set expanded(v) {
+        if (this._expanded === v)
+            return;
+
+        this._expanded = v;
+
+        let forWidth = this._body.clutter_text.width;
+        let [, lineHeight] = 
+            this._body.clutter_text.get_preferred_height (-1);
+
+        let height, scale;
+        if (this._expanded) {
+            let [, natHeight] =
+                this._body.clutter_text.get_preferred_height (forWidth);
+            height = Math.min(6 * lineHeight, natHeight);
+
+            this._actionBin.scale_y = 0;
+            scale = 1.0;
+        } else {
+            height = lineHeight;
+            this._actionBin.scale_y = 1;
+            scale = 0.0;
+        }
+
+        this._actionBin.show();
+        Tweener.addTween(this._body, { height: height, time: 0.2, transition: 'easeOutQuad' });
+        Tweener.addTween(this._actionBin, { scale_y: scale, time: 0.2, transition: 'easeOutQuad',
+                                            onComplete: Lang.bind(this, function() { if (!this._expanded) this._actionBin.hide(); }) });
+    }
+});
+
+const NotificationSection = new Lang.Class({
+    Name: 'NotificationSection',
+    Extends: MessageListSection,
+
+    _init: function() {
+        this.parent('Notifications', Lang.bind(this, this._openSettings));
+
+        this._notificationQueue = [];
+
+        this._bannerBox = new St.Widget({ layout_manager: new Clutter.BinLayout(),
+                                          clip_to_allocation: true });
+        this._bannerBox.add_constraint(new Layout.MonitorConstraint({ primary: true, work_area: true }));
+        Main.layoutManager.addChrome(this._bannerBox, { affectsInputRegion: false });
+
+        global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._checkQueue));
+
+        Main.sessionMode.connect('updated', Lang.bind(this, this._sessionUpdated));
+        this._sessionUpdated();
+    },
+
+    addNotification: function(notification) {
+        let listEntry = new NotificationListEntry(notification);
+        // TODO: Keep URGENT notifications on top
+        this._list.insert_child_below(listEntry.actor, null);
+
+        // TODO: Implement notification queue
+        if (!notification.source.policy.showBanners)
+            return;
+
+        if (this._notificationQueue.indexOf(notification) < 0) {
+        /*
+            notification.connect('destroy',
+                                 Lang.bind(this, this._onNotificationDestroy));
+                                 */
+            this._notificationQueue.push(notification);
+            this._notificationQueue.sort(function(notification1, notification2) {
+                return (notification2.priority - notification1.priority);
+            });
+
+            this._checkQueue();
+        }
+    },
+
+    _checkQueue: function() {
+        if (this._banner)
+            return;
+
+        if (!Main.sessionMode.hasNotifications)
+            return;
+
+        // Filter out acknowledged notifications.
+        this._notificationQueue = this._notificationQueue.filter(function(n) {
+            return !n.acknowledged;
+        });
+
+        if (this._notificationQueue.length == 0)
+            return;
+
+        let notification = this._notificationQueue[0] || null;
+        let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
+        if (!limited || notification.forFeedback || notification.priority == Gio.NotificationPriority.URGENT)
+            this._showBanner();
+    },
+
+    _showBanner: function() {
+        let notification = this._notificationQueue.shift();
+
+        this._banner = new NotificationBanner(notification);
+        this._banner.actor.connect('destroy', Lang.bind(this,
+            function() {
+                this._banner = null;
+                this._checkQueue();
+            }));
+        this._bannerBox.add_actor(this._banner.actor);
+        Main.layoutManager.trackChrome(this._banner.actor, { affectsInputRegion: true });
+
+        this._banner.actor.anchor_y = this._banner.actor.height;
+        this._banner.actor.opacity = 0;
+        Tweener.addTween(this._banner.actor, { anchor_y: 0, opacity: 255, time: 0.2, transition: 'easeOutBack' });
+        Mainloop.timeout_add(2000, Lang.bind(this, this._hideBanner));
+    },
+
+    _hideBanner: function() {
+        Tweener.addTween(this._banner.actor, { anchor_y: this._banner.actor.height, opacity: 0, time: 0.2, transition: 'easeInBack',
+                                               onComplete: Lang.bind(this, function() { this._banner.actor.destroy(); }) });
+    },
+
+    _openSettings: function() {
+        let app = Shell.AppSystem.get_default().lookup_app('gnome-notifications-panel.desktop');
+
+        if (!app) {
+            log('Settings panel for desktop file ' + desktopFile + ' could not be loaded!');
+            return;
+        }
+
+        Main.overview.hide();
+        app.activate();
+    },
+
+    _sessionUpdated: function() {
+        this._title.reactive = Main.sessionMode.allowSettings;
+        this._checkQueue();
     }
 });
 
@@ -1083,16 +1366,64 @@ const EventsSection = new Lang.Class({
 
     setDate: function(date) {
         this.parent(date);
-        this._updateTitle();
         this._reloadEvents();
     },
 
     _sync: function() {
-        this.parent();
+        this.actor.visible = !this.isEmpty() || !_sameDay(this._date, new Date());
+        this._closeButton.visible = !this.isEmpty();
+        this._updateTitle();
     },
 
     _shouldShowForDate: function() {
         return true;
+    }
+});
+
+const Placeholder = new Lang.Class({
+    Name: 'Placeholder',
+
+    _init: function() {
+        this.actor = new St.BoxLayout({ style_class: 'events-placeholder',
+                                        vertical: true });
+
+        this._date = new Date();
+
+        let todayFile = Gio.File.new_for_uri('resource:///org/gnome/shell/theme/no-notifications.svg');
+        let otherFile = Gio.File.new_for_uri('resource:///org/gnome/shell/theme/no-events.svg');
+        this._todayIcon = new Gio.FileIcon({ file: todayFile });
+        this._otherIcon = new Gio.FileIcon({ file: otherFile });
+
+        this._icon = new St.Icon();
+        this.actor.add_actor(this._icon);
+
+        this._label = new St.Label();
+        this.actor.add_actor(this._label);
+
+        this._sync();
+    },
+
+    setDate: function(date) {
+        if (!_sameDay(this._date, date)) {
+            this._date = date;
+            this._sync();
+        }
+    },
+
+    _sync: function() {
+        let isToday = _sameDay(this._date, new Date());
+        if (isToday && this._icon.gicon == this._todayIcon)
+            return;
+        if (!isToday && this._icon.gicon == this._otherIcon)
+            return;
+
+        if (isToday) {
+            this._icon.gicon = this._todayIcon;
+            this._label.text = _("No Notifications");
+        } else {
+            this._icon.gicon = this._otherIcon;
+            this._label.text = _("No Events");
+        }
     }
 });
 
@@ -1104,15 +1435,20 @@ const MessageList = new Lang.Class({
                                      layout_manager: new Clutter.BinLayout(),
                                      x_expand: true, y_expand: true });
 
-        this._placeholder = new St.Icon({ icon_name: 'window-close-symbolic' });
-        this.actor.add_actor(this._placeholder);
+        this._placeholder = new Placeholder();
+        this.actor.add_actor(this._placeholder.actor);
 
         this._scrollView = new St.ScrollView({ x_expand: true, y_expand: true,
                                                y_align: Clutter.ActorAlign.START });
         this.actor.add_actor(this._scrollView);
 
-        this._sectionList = new St.BoxLayout({ vertical: true });
+        this._sectionList = new St.BoxLayout({ style_class: 'message-list-sections',
+                                               vertical: true });
         this._scrollView.add_actor(this._sectionList);
+        this._sections = [];
+
+        this._notificationSection = new NotificationSection();
+        this._addSection(this._notificationSection);
 
         this._eventsSection = new EventsSection();
         this._addSection(this._eventsSection);
@@ -1124,12 +1460,12 @@ const MessageList = new Lang.Class({
         let id = section.actor.connect('notify::visible', Lang.bind(this, this._sync));
         section.actor.connect('destroy', function(a) { a.disconnect(id); });
         this._sectionList.add_actor(section.actor);
+        this._sections.push(section);
     },
 
     _sync: function() {
-        let visible = this._sectionList.get_children().some(function(a) { return a.visible });
-        this._scrollView.visible = visible;
-        this._placeholder.visible = !visible;
+        let visible = this._sections.every(function(s) { return s.isEmpty() || !s.actor.visible });
+        this._placeholder.actor.visible = visible;
     },
 
     setEventSource: function(eventSource) {
@@ -1137,6 +1473,7 @@ const MessageList = new Lang.Class({
     },
 
     setDate: function(date) {
-        this._eventsSection.setDate(date);
+        this._sections.forEach(function(s) { s.setDate(date); });
+        this._placeholder.setDate(date);
     }
 });
