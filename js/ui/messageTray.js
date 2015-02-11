@@ -1397,10 +1397,7 @@ const MessageTray = new Lang.Class({
 
         this.idleMonitor = Meta.IdleMonitor.get_core();
 
-        Main.layoutManager.connect('keyboard-visible-changed', Lang.bind(this, this._onKeyboardVisibleChanged));
-
         this._useLongerNotificationLeftTimeout = false;
-        this._trayLeftTimeoutId = 0;
 
         // pointerInNotification is sort of a misnomer -- it tracks whether
         // a message tray notification should expand. The value is
@@ -1413,13 +1410,10 @@ const MessageTray = new Lang.Class({
         // out non-changing hover notifications in onNotificationHoverChanged.
         this._notificationHovered = false;
 
-        this._keyboardVisible = false;
         this._notificationState = State.HIDDEN;
         this._notificationTimeoutId = 0;
         this._notificationExpandedId = 0;
-        this._desktopCloneState = State.HIDDEN;
         this._notificationRemoved = false;
-        this._reNotifyAfterHideNotification = null;
 
         this.clearableCount = 0;
 
@@ -1635,11 +1629,6 @@ const MessageTray = new Lang.Class({
             this._notificationLeftTimeoutId = Mainloop.timeout_add(timeout, Lang.bind(this, this._onNotificationLeftTimeout));
             GLib.Source.set_name_by_id(this._notificationLeftTimeoutId, '[gnome-shell] this._onNotificationLeftTimeout');
         }
-    },
-
-    _onKeyboardVisibleChanged: function(layoutManager, keyboardVisible) {
-        this._keyboardVisible = keyboardVisible;
-        this._updateState();
     },
 
     _onStatusChanged: function(status) {
