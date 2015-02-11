@@ -1368,22 +1368,22 @@ const MessageTray = new Lang.Class({
             this._onStatusChanged(status);
         }));
 
-        this._notificationWidget = new St.Widget({ name: 'notification-container',
-                                                   reactive: true,
-                                                   track_hover: true,
-                                                   y_align: Clutter.ActorAlign.START,
-                                                   x_align: Clutter.ActorAlign.CENTER,
-                                                   y_expand: true,
-                                                   x_expand: true,
-                                                   layout_manager: new Clutter.BinLayout() });
-        this._notificationWidget.connect('key-release-event', Lang.bind(this, this._onNotificationKeyRelease));
-        this._notificationWidget.connect('notify::hover', Lang.bind(this, this._onNotificationHoverChanged));
+        this.actor = new St.Widget({ name: 'notification-container',
+                                     reactive: true,
+                                     track_hover: true,
+                                     y_align: Clutter.ActorAlign.START,
+                                     x_align: Clutter.ActorAlign.CENTER,
+                                     y_expand: true,
+                                     x_expand: true,
+                                     layout_manager: new Clutter.BinLayout() });
+        this.actor.connect('key-release-event', Lang.bind(this, this._onNotificationKeyRelease));
+        this.actor.connect('notify::hover', Lang.bind(this, this._onNotificationHoverChanged));
 
         this._notificationBin = new St.Bin({ y_expand: true });
         this._notificationBin.set_y_align(Clutter.ActorAlign.START);
-        this._notificationWidget.add_actor(this._notificationBin);
-        this._notificationWidget.hide();
-        this._notificationFocusGrabber = new FocusGrabber(this._notificationWidget);
+        this.actor.add_actor(this._notificationBin);
+        this.actor.hide();
+        this._notificationFocusGrabber = new FocusGrabber(this.actor);
         this._notificationQueue = [];
         this._notification = null;
         this._notificationClickedId = 0;
@@ -1391,7 +1391,7 @@ const MessageTray = new Lang.Class({
         this._closeButton = Util.makeCloseButton();
         this._closeButton.hide();
         this._closeButton.connect('clicked', Lang.bind(this, this._closeNotification));
-        this._notificationWidget.add_actor(this._closeButton);
+        this.actor.add_actor(this._closeButton);
 
         this._userActiveWhileNotificationShown = false;
 
@@ -1409,7 +1409,7 @@ const MessageTray = new Lang.Class({
         // state of the pointer when a notification pops up.
         this._pointerInNotification = false;
 
-        // This tracks this._notificationWidget.hover and is used to fizzle
+        // This tracks this.actor.hover and is used to fizzle
         // out non-changing hover notifications in onNotificationHoverChanged.
         this._notificationHovered = false;
 
@@ -1423,17 +1423,8 @@ const MessageTray = new Lang.Class({
 
         this.clearableCount = 0;
 
-        this._lightboxes = [];
-        let lightboxContainers = [global.window_group,
-                                  Main.layoutManager.overviewGroup];
-        for (let i = 0; i < lightboxContainers.length; i++)
-            this._lightboxes.push(new Lightbox.Lightbox(lightboxContainers[i],
-                                                        { inhibitEvents: true,
-                                                          fadeFactor: 0.2
-                                                        }));
-
-        Main.layoutManager.trayBox.add_actor(this._notificationWidget);
-        Main.layoutManager.trackChrome(this._notificationWidget);
+        Main.layoutManager.trayBox.add_actor(this.actor);
+        Main.layoutManager.trackChrome(this.actor);
         Main.layoutManager.trackChrome(this._closeButton);
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._updateState));
@@ -1451,10 +1442,6 @@ const MessageTray = new Lang.Class({
         this._sources = new Map();
 
         this._sessionUpdated();
-    },
-
-    close: function() {
-        this._escapeTray();
     },
 
     _sessionUpdated: function() {
@@ -1607,10 +1594,10 @@ const MessageTray = new Lang.Class({
     },
 
     _onNotificationHoverChanged: function() {
-        if (this._notificationWidget.hover == this._notificationHovered)
+        if (this.actor.hover == this._notificationHovered)
             return;
 
-        this._notificationHovered = this._notificationWidget.hover;
+        this._notificationHovered = this.actor.hover;
         if (this._notificationHovered) {
             this._resetNotificationLeftTimeout();
 
@@ -1624,7 +1611,7 @@ const MessageTray = new Lang.Class({
                 // automatically. Instead, the user is able to expand the notification by mousing away from it and then
                 // mousing back in. Because this is an expected action, we set the boolean flag that indicates that a longer
                 // timeout should be used before popping down the notification.
-                if (this._notificationWidget.contains(actorAtShowNotificationPosition)) {
+                if (this._notificationBin.contains(actorAtShowNotificationPosition)) {
                     this._useLongerNotificationLeftTimeout = true;
                     return;
                 }
@@ -1810,9 +1797,9 @@ const MessageTray = new Lang.Class({
         }));
         this._notificationBin.child = this._notification.actor;
 
-        this._notificationWidget.opacity = 0;
-        this._notificationWidget.y = 0;
-        this._notificationWidget.show();
+        this.actor.opacity = 0;
+        this.actor.y = 0;
+        this.actor.show();
 
         this._updateShowingNotification();
 
@@ -1855,14 +1842,14 @@ const MessageTray = new Lang.Class({
         // notification is being shown.
 
         let tweenParams = { opacity: 255,
-                            y: -this._notificationWidget.height,
+                            y: -this.actor.height,
                             time: ANIMATION_TIME,
                             transition: 'easeOutQuad',
                             onComplete: this._showNotificationCompleted,
                             onCompleteScope: this
                           };
 
-        this._tween(this._notificationWidget, '_notificationState', State.SHOWN, tweenParams);
+        this._tween(this.actor, '_notificationState', State.SHOWN, tweenParams);
    },
 
     _showNotificationCompleted: function() {
@@ -1926,7 +1913,7 @@ const MessageTray = new Lang.Class({
         this._resetNotificationLeftTimeout();
 
         if (animate) {
-            this._tween(this._notificationWidget, '_notificationState', State.HIDDEN,
+            this._tween(this.actor, '_notificationState', State.HIDDEN,
                         { y: 0,
                           opacity: 0,
                           time: ANIMATION_TIME,
@@ -1935,9 +1922,9 @@ const MessageTray = new Lang.Class({
                           onCompleteScope: this
                         });
         } else {
-            Tweener.removeTweens(this._notificationWidget);
-            this._notificationWidget.y = 0;
-            this._notificationWidget.opacity = 0;
+            Tweener.removeTweens(this.actor);
+            this.actor.y = 0;
+            this.actor.opacity = 0;
             this._notificationState = State.HIDDEN;
             this._hideNotificationCompleted();
         }
@@ -1955,7 +1942,7 @@ const MessageTray = new Lang.Class({
         this._pointerInNotification = false;
         this._notificationRemoved = false;
         this._notificationBin.child = null;
-        this._notificationWidget.hide();
+        this.actor.hide();
     },
 
     _expandActiveNotification: function() {
@@ -1979,17 +1966,17 @@ const MessageTray = new Lang.Class({
     },
 
     _onNotificationExpanded: function() {
-        let expandedY = - this._notificationWidget.height;
+        let expandedY = - this.actor.height;
         this._closeButton.show();
 
         // Don't animate the notification to its new position if it has shrunk:
         // there will be a very visible "gap" that breaks the illusion.
-        if (this._notificationWidget.y < expandedY) {
-            this._notificationWidget.y = expandedY;
+        if (this.actor.y < expandedY) {
+            this.actor.y = expandedY;
         } else if (this._notification.y != expandedY) {
             // Tween also opacity here, to override a possible tween that's
             // currently hiding the notification.
-            Tweener.addTween(this._notificationWidget,
+            Tweener.addTween(this.actor,
                              { y: expandedY,
                                opacity: 255,
                                time: ANIMATION_TIME,
