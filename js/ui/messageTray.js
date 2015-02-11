@@ -4,7 +4,6 @@ const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const Gtk = imports.gi.Gtk;
-const GnomeDesktop = imports.gi.GnomeDesktop;
 const Atk = imports.gi.Atk;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
@@ -13,28 +12,17 @@ const Pango = imports.gi.Pango;
 const Shell = imports.gi.Shell;
 const Signals = imports.signals;
 const St = imports.gi.St;
-const Tp = imports.gi.TelepathyGLib;
 
-const EdgeDragAction = imports.ui.edgeDragAction;
-const BoxPointer = imports.ui.boxpointer;
-const CtrlAltTab = imports.ui.ctrlAltTab;
 const GnomeSession = imports.misc.gnomeSession;
-const GrabHelper = imports.ui.grabHelper;
-const Lightbox = imports.ui.lightbox;
 const Main = imports.ui.main;
-const PointerWatcher = imports.ui.pointerWatcher;
-const PopupMenu = imports.ui.popupMenu;
 const Params = imports.misc.params;
 const Tweener = imports.ui.tweener;
 const Util = imports.misc.util;
-const ViewSelector = imports.ui.viewSelector;
 
 const SHELL_KEYBINDINGS_SCHEMA = 'org.gnome.shell.keybindings';
 
 const ANIMATION_TIME = 0.2;
 const NOTIFICATION_TIMEOUT = 4;
-const SUMMARY_TIMEOUT = 1;
-const LONGER_SUMMARY_TIMEOUT = 4;
 
 const HIDE_TIMEOUT = 0.2;
 const LONGER_HIDE_TIMEOUT = 0.6;
@@ -42,11 +30,6 @@ const LONGER_HIDE_TIMEOUT = 0.6;
 // We delay hiding of the tray if the mouse is within MOUSE_LEFT_ACTOR_THRESHOLD
 // range from the point where it left the tray.
 const MOUSE_LEFT_ACTOR_THRESHOLD = 20;
-
-// Time the user needs to leave the mouse on the bottom pixel row to open the tray
-const TRAY_DWELL_TIME = 1000; // ms
-// Time resolution when tracking the mouse to catch the open tray dwell
-const TRAY_DWELL_CHECK_INTERVAL = 100; // ms
 
 const IDLE_TIME = 1000;
 
