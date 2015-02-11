@@ -1450,7 +1450,6 @@ const MessageTray = new Lang.Class({
                                                         }));
 
         Main.layoutManager.trayBox.add_actor(this._notificationWidget);
-        Main.layoutManager.trackChrome(this.actor);
         Main.layoutManager.trackChrome(this._notificationWidget);
         Main.layoutManager.trackChrome(this._closeButton);
 
@@ -1469,23 +1468,10 @@ const MessageTray = new Lang.Class({
         this._sources = new Map();
 
         this._sessionUpdated();
-
-        this._noMessages = new St.Label({ text: _("No Messages"),
-                                          style_class: 'no-messages-label',
-                                          x_align: Clutter.ActorAlign.CENTER,
-                                          x_expand: true,
-                                          y_align: Clutter.ActorAlign.CENTER,
-                                          y_expand: true });
-        this.actor.add_actor(this._noMessages);
-        this._updateNoMessagesLabel();
     },
 
     close: function() {
         this._escapeTray();
-    },
-
-    _updateNoMessagesLabel: function() {
-        this._noMessages.visible = this._sources.size == 0;
     },
 
     _sessionUpdated: function() {
@@ -1556,8 +1542,6 @@ const MessageTray = new Lang.Class({
             }));
 
         this.emit('source-added', source);
-
-        this._updateNoMessagesLabel();
     },
 
     _removeSource: function(source) {
@@ -1572,8 +1556,6 @@ const MessageTray = new Lang.Class({
         source.disconnect(obj.mutedChangedId);
 
         this.emit('source-removed', source);
-
-        this._updateNoMessagesLabel();
     },
 
     getSources: function() {
@@ -1659,7 +1641,7 @@ const MessageTray = new Lang.Class({
                 // automatically. Instead, the user is able to expand the notification by mousing away from it and then
                 // mousing back in. Because this is an expected action, we set the boolean flag that indicates that a longer
                 // timeout should be used before popping down the notification.
-                if (this.actor.contains(actorAtShowNotificationPosition)) {
+                if (this._notificationWidget.contains(actorAtShowNotificationPosition)) {
                     this._useLongerNotificationLeftTimeout = true;
                     return;
                 }
@@ -1962,7 +1944,7 @@ const MessageTray = new Lang.Class({
 
         if (animate) {
             this._tween(this._notificationWidget, '_notificationState', State.HIDDEN,
-                        { y: this.actor.height,
+                        { y: 0,
                           opacity: 0,
                           time: ANIMATION_TIME,
                           transition: 'easeOutQuad',
@@ -1971,7 +1953,7 @@ const MessageTray = new Lang.Class({
                         });
         } else {
             Tweener.removeTweens(this._notificationWidget);
-            this._notificationWidget.y = this.actor.height;
+            this._notificationWidget.y = 0;
             this._notificationWidget.opacity = 0;
             this._notificationState = State.HIDDEN;
             this._hideNotificationCompleted();
