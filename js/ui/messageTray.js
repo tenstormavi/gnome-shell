@@ -555,8 +555,7 @@ const Notification = new Lang.Class({
         }
 
         // We always clear the content area if we don't have custom
-        // content because it might contain the @banner that didn't
-        // fit in the banner mode.
+        // content because it contains the @banner
         if (this._scrollArea && (!this._customContent || params.clear)) {
             if (oldFocus && this._scrollArea.contains(oldFocus))
                 this.actor.grab_key_focus();
@@ -573,8 +572,6 @@ const Notification = new Lang.Class({
             this._actionArea = null;
             this._buttonBox = null;
         }
-        if (!this._scrollArea && !this._actionArea)
-            this._grid.remove_style_class_name('multi-line-notification');
 
         if (params.gicon) {
             this._icon = new St.Icon({ gicon: params.gicon,
@@ -640,7 +637,6 @@ const Notification = new Lang.Class({
     },
 
     _createScrollArea: function() {
-        this._grid.add_style_class_name('multi-line-notification');
         this._scrollArea = new St.ScrollView({ style_class: 'notification-scrollview',
                                                vscrollbar_policy: this._scrollPolicy,
                                                hscrollbar_policy: Gtk.PolicyType.NEVER,
@@ -720,7 +716,6 @@ const Notification = new Lang.Class({
         this._actionArea.visible = this.expanded;
 
         let layout = this._grid.layout_manager;
-        this._grid.add_style_class_name('multi-line-notification');
         layout.attach_next_to(this._actionArea, null,
                               Clutter.GridPosition.BOTTOM, 4, 1);
         this.updated();
@@ -1665,6 +1660,7 @@ const MessageTray = new Lang.Class({
     },
 
     _hideNotification: function(animate) {
+    return;
         this._notificationFocusGrabber.ungrabFocus();
 
         if (this._notificationExpandedId) {
