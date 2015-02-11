@@ -1165,6 +1165,12 @@ const NotificationSection = new Lang.Class({
 
         this._notificationQueue = [];
 
+        this._sources = new Map();
+        Main.messageTray.connect('source-added', Lang.bind(this, this._sourceAdded));
+        Main.messageTray.getSources().forEach(Lang.bind(this, function(source) {
+            this._sourceAdded(Main.messageTray, source);
+        }));
+
         this._bannerBox = new St.Widget({ layout_manager: new Clutter.BinLayout(),
                                           clip_to_allocation: true });
         this._bannerBox.add_constraint(new Layout.MonitorConstraint({ primary: true, work_area: true }));
@@ -1174,6 +1180,39 @@ const NotificationSection = new Lang.Class({
 
         Main.sessionMode.connect('updated', Lang.bind(this, this._sessionUpdated));
         this._sessionUpdated();
+    },
+
+    _sourceAdded: function(tray, source) {
+        let obj = {
+            sourceTitleChangedId: 0,
+            sourceDestroyId: 0,
+            sourceNotificationAdded: 0,
+        };
+
+/*
+        obj.sourceTitleChangedId = source.connect('title-changed', Lang.bind(this, function(source) {
+            this._titleChanged(source, obj);
+        }));
+        obj.sourceDestroyId = source.connect('destroy', Lang.bind(this, function(source) {
+            this._onSourceDestroy(source, obj);
+        }));
+        */
+        obj.sourceNotificationAdded = source.connect('notification-added',
+                                                     Lang.bind(this, this._onNotificationAdded));
+
+        this._sources.set(source, obj);
+    },
+
+    _onNotificationAdded: function(source, notification) {
+        let gicon = notification._icon ? notification._icon.gicon : source.getIcon();
+        let body = '';
+        if (notification.bannerBodyText) {
+            body = notification.bannerBodyMarkup ? notification.bannerBodyText
+                                                 : GLib.markup_escape_text(notification.bannerBodyText, -1);
+        }
+        let listEntry = new MessageListEntry(notification.title, body, { gicon: gicon, time: new Date() });
+        // TODO: Keep URGENT notifications on top
+        this._list.insert_child_below(listEntry.actor, null);
     },
 
     addNotification: function(notification) {
