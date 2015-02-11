@@ -1492,6 +1492,10 @@ StScrollBar StButton#vhandle:active {
     background-color: #4c4c4c;
 }
 
+.event-grid {
+    spacing-columns: 6px;
+}
+
 .event-title {
     font-weight: bold;
 }
@@ -1545,11 +1549,10 @@ StScrollBar StButton#vhandle:active {
     padding-right: 8pt;
 }
 
-.message-list-section {
-    spacing: 6px;
-}
-
-.message-list-section-title-box {
+.message-list-sections,
+.message-list-section,
+.message-list-section-title-box,
+.message-list-section-list {
     spacing: 6px;
 }
 
@@ -1562,10 +1565,6 @@ StScrollBar StButton#vhandle:active {
     background-color: #999999;
 }
 
-.message-list-section-list {
-    spacing: 6px;
-}
-
 .message-list-section-close > StIcon {
     icon-size: 16px;
     color: rgba(0, 0, 0, 0.9);
@@ -1575,6 +1574,17 @@ StScrollBar StButton#vhandle:active {
 
 .message-list-section-close:hover > StIcon {
     background-color: #4c4c4c;
+}
+
+.notification-banner {
+    border-radius: 5px;
+    background: rgba(0,0,0,0.9);
+    padding: 8px;
+    margin: 5px;
+    spacing-rows: 4px;
+    spacing-columns: 10px;
+    font-size: 11pt;
+    width: 34em;
 }
 
 /* Message Tray */
