@@ -1373,164 +1373,6 @@ const Source = new Lang.Class({
 });
 Signals.addSignalMethods(Source.prototype);
 
-const MessageTrayMenu = new Lang.Class({
-    Name: 'MessageTrayMenu',
-    Extends: PopupMenu.PopupMenu,
-
-    _init: function(button, tray) {
-        this.parent(button, 0, St.Side.BOTTOM);
-
-        this._tray = tray;
-
-        this._presence = new GnomeSession.Presence(Lang.bind(this, function(proxy, error) {
-            if (error) {
-                logError(error, 'Error while reading gnome-session presence');
-                return;
-            }
-
-            this._onStatusChanged(proxy.status);
-        }));
-        this._presence.connectSignal('StatusChanged', Lang.bind(this, function(proxy, senderName, [status]) {
-            this._onStatusChanged(status);
-        }));
-
-        this._accountManager = Tp.AccountManager.dup();
-        this._accountManager.connect('most-available-presence-changed',
-                                     Lang.bind(this, this._onIMPresenceChanged));
-        this._accountManager.prepare_async(null, Lang.bind(this, this._onIMPresenceChanged));
-
-        this.actor.hide();
-        Main.layoutManager.addChrome(this.actor);
-
-        this._busyItem = new PopupMenu.PopupSwitchMenuItem(_("Notifications"));
-        this._busyItem.connect('toggled', Lang.bind(this, this._updatePresence));
-        this.addMenuItem(this._busyItem);
-
-        let separator = new PopupMenu.PopupSeparatorMenuItem();
-        this.addMenuItem(separator);
-
-        this._clearItem = this.addAction(_("Clear Messages"), function() {
-            let toDestroy = tray.getSources().filter(function(source) {
-                return source.isClearable;
-            });
-
-            toDestroy.forEach(function(source) {
-                source.destroy();
-            });
-
-            tray.close();
-        });
-
-        tray.connect('source-added', Lang.bind(this, this._updateClearSensitivity));
-        tray.connect('source-removed', Lang.bind(this, this._updateClearSensitivity));
-        this._updateClearSensitivity();
-
-        let separator = new PopupMenu.PopupSeparatorMenuItem();
-        this.addMenuItem(separator);
-
-        let settingsItem = this.addSettingsAction(_("Notification Settings"), 'gnome-notifications-panel.desktop');
-        settingsItem.connect('activate', function() { tray.close(); });
-    },
-
-    _onStatusChanged: function(status) {
-        this._sessionStatus = status;
-        this._busyItem.setToggleState(status != GnomeSession.PresenceStatus.BUSY);
-    },
-
-    _onIMPresenceChanged: function(am, type) {
-        if (type == Tp.ConnectionPresenceType.AVAILABLE &&
-            this._sessionStatus == GnomeSession.PresenceStatus.BUSY)
-            this._presence.SetStatusRemote(GnomeSession.PresenceStatus.AVAILABLE);
-    },
-
-    _updateClearSensitivity: function() {
-        this._clearItem.setSensitive(this._tray.clearableCount > 0);
-    },
-
-    _updatePresence: function(item, state) {
-        let status = state ? GnomeSession.PresenceStatus.AVAILABLE
-                           : GnomeSession.PresenceStatus.BUSY;
-        this._presence.SetStatusRemote(status);
-
-        let [type, s ,msg] = this._accountManager.get_most_available_presence();
-        let newType = 0;
-        let newStatus;
-        if (status == GnomeSession.PresenceStatus.BUSY &&
-            type == Tp.ConnectionPresenceType.AVAILABLE) {
-            newType = Tp.ConnectionPresenceType.BUSY;
-            newStatus = 'busy';
-        } else if (status == GnomeSession.PresenceStatus.AVAILABLE &&
-                 type == Tp.ConnectionPresenceType.BUSY) {
-            newType = Tp.ConnectionPresenceType.AVAILABLE;
-            newStatus = 'available';
-        }
-
-        if (newType > 0)
-            this._accountManager.set_all_requested_presences(newType,
-                                                             newStatus, msg);
-    }
-});
-
-const MessageTrayMenuButton = new Lang.Class({
-    Name: 'MessageTrayMenuButton',
-
-    _init: function(tray) {
-        this._icon = new St.Icon();
-        this.actor = new St.Button({ style_class: 'message-tray-menu-button',
-                                     reactive: true,
-                                     track_hover: true,
-                                     can_focus: true,
-                                     button_mask: St.ButtonMask.ONE | St.ButtonMask.TWO | St.ButtonMask.THREE,
-                                     accessible_name: _("Tray Menu"),
-                                     accessible_role: Atk.Role.MENU,
-                                     child: this._icon });
-
-        // Standard hack for ClutterBinLayout.
-        this.actor.set_x_expand(true);
-        this.actor.set_y_expand(true);
-        this.actor.set_x_align(Clutter.ActorAlign.START);
-
-        this._menu = new MessageTrayMenu(this.actor, tray);
-        this._manager = new PopupMenu.PopupMenuManager({ actor: this.actor });
-        this._manager.addMenu(this._menu);
-        this._menu.connect('open-state-changed', Lang.bind(this, function(menu, open) {
-            if (open)
-                this.actor.add_style_pseudo_class('active');
-            else
-                this.actor.remove_style_pseudo_class('active');
-        }));
-
-        this.actor.connect('clicked', Lang.bind(this, function() {
-            this._menu.toggle();
-        }));
-
-        this._accountManager = Tp.AccountManager.dup();
-        this._accountManager.connect('most-available-presence-changed',
-                                     Lang.bind(this, this._sync));
-        this._accountManager.prepare_async(null, Lang.bind(this, this._sync));
-    },
-
-    _iconForPresence: function(presence) {
-        if (presence == Tp.ConnectionPresenceType.AVAILABLE)
-            return 'user-available-symbolic';
-        else if (presence == Tp.ConnectionPresenceType.BUSY)
-            return 'user-busy-symbolic';
-        else if (presence == Tp.ConnectionPresenceType.HIDDEN)
-            return 'user-hidden-symbolic';
-        else if (presence == Tp.ConnectionPresenceType.AWAY)
-            return 'user-away-symbolic';
-        else if (presence == Tp.ConnectionPresenceType.EXTENDED_AWAY)
-            return 'user-idle-symbolic';
-        else
-            return 'emblem-system-symbolic';
-    },
-
-    _sync: function() {
-        let [presence, status, message] = this._accountManager.get_most_available_presence();
-        this._icon.icon_name = this._iconForPresence(presence);
-    },
-});
-
 const MessageTray = new Lang.Class({
     Name: 'MessageTray',
 
@@ -1542,14 +1384,6 @@ const MessageTray = new Lang.Class({
         this._presence.connectSignal('StatusChanged', Lang.bind(this, function(proxy, senderName, [status]) {
             this._onStatusChanged(status);
         }));
-
-        this.actor = new St.Widget({ name: 'message-tray',
-                                     reactive: true,
-                                     layout_manager: new Clutter.BinLayout(),
-                                     x_expand: true,
-                                     y_expand: true,
-                                     y_align: Clutter.ActorAlign.START,
-                                   });
 
         this._notificationWidget = new St.Widget({ name: 'notification-container',
                                                    reactive: true,
@@ -1571,13 +1405,6 @@ const MessageTray = new Lang.Class({
         this._notification = null;
         this._notificationClickedId = 0;
 
-        this.actor.connect('button-release-event', Lang.bind(this, function(actor, event) {
-            this._updateState();
-            actor.grab_key_focus();
-            return Clutter.EVENT_PROPAGATE;
-        }));
-        global.focus_manager.add_group(this.actor);
-
         this._closeButton = Util.makeCloseButton();
         this._closeButton.hide();
         this._closeButton.connect('clicked', Lang.bind(this, this._closeNotification));
@@ -1587,14 +1414,8 @@ const MessageTray = new Lang.Class({
 
         this.idleMonitor = Meta.IdleMonitor.get_core();
 
-        this._grabHelper = new GrabHelper.GrabHelper(this.actor,
-                                                     { actionMode: Shell.ActionMode.MESSAGE_TRAY });
-        this._grabHelper.addActor(this.actor);
-
         Main.layoutManager.connect('keyboard-visible-changed', Lang.bind(this, this._onKeyboardVisibleChanged));
 
-        this._trayState = State.HIDDEN;
-        this._traySummoned = false;
         this._useLongerNotificationLeftTimeout = false;
         this._trayLeftTimeoutId = 0;
 
@@ -1616,8 +1437,6 @@ const MessageTray = new Lang.Class({
         this._desktopCloneState = State.HIDDEN;
         this._notificationRemoved = false;
         this._reNotifyAfterHideNotification = null;
-        this._desktopClone = null;
-        this._inCtrlAltTab = false;
 
         this.clearableCount = 0;
 
@@ -1630,29 +1449,15 @@ const MessageTray = new Lang.Class({
                                                           fadeFactor: 0.2
                                                         }));
 
-        Main.layoutManager.trayBox.add_actor(this.actor);
         Main.layoutManager.trayBox.add_actor(this._notificationWidget);
         Main.layoutManager.trackChrome(this.actor);
         Main.layoutManager.trackChrome(this._notificationWidget);
         Main.layoutManager.trackChrome(this._closeButton);
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._updateState));
-        Main.layoutManager.connect('hot-corners-changed', Lang.bind(this, this._hotCornersChanged));
-
-        // If the overview shows or hides while we're in
-        // the message tray, revert back to normal mode.
-        Main.overview.connect('showing', Lang.bind(this, this._escapeTray));
-        Main.overview.connect('hiding', Lang.bind(this, this._escapeTray));
 
         Main.sessionMode.connect('updated', Lang.bind(this, this._sessionUpdated));
 
-        Main.wm.addKeybinding('toggle-message-tray',
-                              new Gio.Settings({ schema_id: SHELL_KEYBINDINGS_SCHEMA }),
-                              Meta.KeyBindingFlags.NONE,
-                              Shell.ActionMode.NORMAL |
-                              Shell.ActionMode.MESSAGE_TRAY |
-                              Shell.ActionMode.OVERVIEW,
-                              Lang.bind(this, this.toggle));
         Main.wm.addKeybinding('focus-active-notification',
                               new Gio.Settings({ schema_id: SHELL_KEYBINDINGS_SCHEMA }),
                               Meta.KeyBindingFlags.NONE,
@@ -1663,10 +1468,7 @@ const MessageTray = new Lang.Class({
 
         this._sources = new Map();
 
-        this._trayDwellTimeoutId = 0;
-        this._setupTrayDwellIfNeeded();
         this._sessionUpdated();
-        this._hotCornersChanged();
 
         this._noMessages = new St.Label({ text: _("No Messages"),
                                           style_class: 'no-messages-label',
@@ -1676,30 +1478,10 @@ const MessageTray = new Lang.Class({
                                           y_expand: true });
         this.actor.add_actor(this._noMessages);
         this._updateNoMessagesLabel();
-
-        this._messageTrayMenuButton = new MessageTrayMenuButton(this);
-        this.actor.add_actor(this._messageTrayMenuButton.actor);
-
-        let gesture = new EdgeDragAction.EdgeDragAction(St.Side.BOTTOM,
-                                                        Shell.ActionMode.NORMAL |
-                                                        Shell.ActionMode.OVERVIEW);
-        gesture.connect('activated', Lang.bind(this, this.toggle));
-        global.stage.add_action(gesture);
     },
 
     close: function() {
         this._escapeTray();
-    },
-
-    _setupTrayDwellIfNeeded: function() {
-        // If we don't have extended barrier features, then we need
-        // to support the old tray dwelling mechanism.
-        if (!global.display.supports_extended_barriers()) {
-            let pointerWatcher = PointerWatcher.getPointerWatcher();
-            pointerWatcher.addWatch(TRAY_DWELL_CHECK_INTERVAL, Lang.bind(this, this._checkTrayDwell));
-            this._trayDwelling = false;
-            this._trayDwellUserTime = 0;
-        }
     },
 
     _updateNoMessagesLabel: function() {
@@ -1708,63 +1490,6 @@ const MessageTray = new Lang.Class({
 
     _sessionUpdated: function() {
         this._updateState();
-    },
-
-    _checkTrayDwell: function(x, y) {
-        let monitor = Main.layoutManager.bottomMonitor;
-        let shouldDwell = (x >= monitor.x && x <= monitor.x + monitor.width &&
-                           y == monitor.y + monitor.height - 1);
-        if (shouldDwell) {
-            // We only set up dwell timeout when the user is not hovering over the tray
-            // (!this._notificationHovered). This avoids bringing up the message tray after the
-            // user clicks on a notification with the pointer on the bottom pixel
-            // of the monitor. The _trayDwelling variable is used so that we only try to
-            // fire off one tray dwell - if it fails (because, say, the user has the mouse down),
-            // we don't try again until the user moves the mouse up and down again.
-            if (!this._trayDwelling && !this._notificationHovered && this._trayDwellTimeoutId == 0) {
-                // Save the interaction timestamp so we can detect user input
-                let focusWindow = global.display.focus_window;
-                this._trayDwellUserTime = focusWindow ? focusWindow.user_time : 0;
-
-                this._trayDwellTimeoutId = Mainloop.timeout_add(TRAY_DWELL_TIME,
-                                                                Lang.bind(this, this._trayDwellTimeout));
-                GLib.Source.set_name_by_id(this._trayDwellTimeoutId, '[gnome-shell] this._trayDwellTimeout');
-            }
-            this._trayDwelling = true;
-        } else {
-            this._cancelTrayDwell();
-            this._trayDwelling = false;
-        }
-    },
-
-    _cancelTrayDwell: function() {
-        if (this._trayDwellTimeoutId != 0) {
-            Mainloop.source_remove(this._trayDwellTimeoutId);
-            this._trayDwellTimeoutId = 0;
-        }
-    },
-
-    _trayDwellTimeout: function() {
-        this._trayDwellTimeoutId = 0;
-
-        if (Main.layoutManager.bottomMonitor.inFullscreen)
-            return GLib.SOURCE_REMOVE;
-
-        // We don't want to open the tray when a modal dialog
-        // is up, so we check the modal count for that. When we are in the
-        // overview we have to take the overview's modal push into account
-        if (Main.modalCount > (Main.overview.visible ? 1 : 0))
-            return GLib.SOURCE_REMOVE;
-
-        // If the user interacted with the focus window since we started the tray
-        // dwell (by clicking or typing), don't activate the message tray
-        let focusWindow = global.display.focus_window;
-        let currentUserTime = focusWindow ? focusWindow.user_time : 0;
-        if (currentUserTime != this._trayDwellUserTime)
-            return GLib.SOURCE_REMOVE;
-
-        this.openTray();
-        return GLib.SOURCE_REMOVE;
     },
 
     _onNotificationKeyRelease: function(actor, event) {
@@ -1884,25 +1609,7 @@ const MessageTray = new Lang.Class({
             this._notificationQueue.splice(index, 1);
     },
 
-    openTray: function() {
-        if (Main.overview.animationInProgress)
-            return;
-
-        this._traySummoned = true;
-        this._updateState();
-    },
-
-    toggle: function() {
-        if (Main.overview.animationInProgress)
-            return false;
-
-        this._traySummoned = !this._traySummoned;
-        this._updateState();
-        return true;
-    },
-
     hide: function() {
-        this._traySummoned = false;
         this._updateState();
     },
 
@@ -1924,13 +1631,6 @@ const MessageTray = new Lang.Class({
         this._updateState();
     },
 
-    _hotCornersChanged: function() {
-        let primary = Main.layoutManager.primaryIndex;
-        let corner = Main.layoutManager.hotCorners[primary];
-        if (corner && corner.actor)
-            this._grabHelper.addActor(corner.actor);
-    },
-
     _resetNotificationLeftTimeout: function() {
         this._useLongerNotificationLeftTimeout = false;
         if (this._notificationLeftTimeoutId) {
@@ -1947,9 +1647,6 @@ const MessageTray = new Lang.Class({
 
         this._notificationHovered = this._notificationWidget.hover;
         if (this._notificationHovered) {
-            // No dwell inside notifications at the bottom of the screen
-            this._cancelTrayDwell();
-
             this._resetNotificationLeftTimeout();
 
             if (this._showNotificationMouseX >= 0) {
@@ -2033,7 +1730,6 @@ const MessageTray = new Lang.Class({
 
     _escapeTray: function() {
         this._pointerInNotification = false;
-        this._traySummoned = false;
         this._updateNotificationTimeout(0);
         this._updateState();
     },
@@ -2059,9 +1755,8 @@ const MessageTray = new Lang.Class({
         let hasNotifications = Main.sessionMode.hasNotifications;
 
         if (this._notificationState == State.HIDDEN) {
-            let shouldShowNotification = (hasNotifications && this._trayState == State.HIDDEN && !this._traySummoned);
             let nextNotification = this._notificationQueue[0] || null;
-            if (shouldShowNotification && nextNotification) {
+            if (hasNotifications && nextNotification) {
                 let limited = this._busy || Main.layoutManager.bottomMonitor.inFullscreen;
                 let showNextNotification = (!limited || nextNotification.forFeedback || nextNotification.urgency == Urgency.CRITICAL);
                 if (showNextNotification) {
@@ -2072,9 +1767,6 @@ const MessageTray = new Lang.Class({
                         this.add(source);
                         let notification = new Notification(source, ngettext("%d new message", "%d new messages", len).format(len));
                         notification.setTransient(true);
-                        notification.connect('clicked', Lang.bind(this, function() {
-                            this.openTray();
-                        }));
                         source.notify(notification);
                     } else {
                         this._showNotification();
@@ -2087,7 +1779,7 @@ const MessageTray = new Lang.Class({
                            this._notification.urgency != Urgency.CRITICAL &&
                            !this._notification.focused &&
                            !this._pointerInNotification) || this._notificationExpired;
-            let mustClose = (this._notificationRemoved || !hasNotifications || expired || this._traySummoned);
+            let mustClose = (this._notificationRemoved || !hasNotifications || expired);
 
             if (mustClose) {
                 let animate = hasNotifications && !this._notificationRemoved;
@@ -2098,25 +1790,6 @@ const MessageTray = new Lang.Class({
                 this._ensureNotificationFocused();
             }
         }
-
-        // Tray itself
-        let trayIsVisible = (this._trayState == State.SHOWING ||
-                             this._trayState == State.SHOWN);
-        let trayShouldBeVisible = this._traySummoned && !this._keyboardVisible && hasNotifications;
-        if (!trayIsVisible && trayShouldBeVisible)
-            trayShouldBeVisible = this._showTray();
-        else if (trayIsVisible && !trayShouldBeVisible)
-            this._hideTray();
-
-        // Desktop clone
-        let desktopCloneIsVisible = (this._desktopCloneState == State.SHOWING ||
-                                     this._desktopCloneState == State.SHOWN);
-        let desktopCloneShouldBeVisible = (trayShouldBeVisible);
-
-        if (!desktopCloneIsVisible && desktopCloneShouldBeVisible)
-            this._showDesktopClone();
-        else if (desktopCloneIsVisible && !desktopCloneShouldBeVisible)
-            this._hideDesktopClone();
 
         this._updatingState = false;
 
@@ -2147,90 +1820,6 @@ const MessageTray = new Lang.Class({
         if (onComplete)
             onComplete.apply(onCompleteScope, onCompleteParams);
         this._updateState();
-    },
-
-    _showTray: function() {
-        if (!this._grabHelper.grab({ actor: this.actor,
-                                     onUngrab: Lang.bind(this, this._escapeTray) })) {
-            this._traySummoned = false;
-            return false;
-        }
-
-        this.emit('showing');
-        this._tween(this.actor, '_trayState', State.SHOWN,
-                    { y: -this.actor.height,
-                      time: ANIMATION_TIME,
-                      transition: 'easeOutQuad'
-                    });
-
-        for (let i = 0; i < this._lightboxes.length; i++)
-            this._lightboxes[i].show(ANIMATION_TIME);
-
-        return true;
-    },
-
-    _updateDesktopCloneClip: function() {
-        let geometry = this._bottomMonitorGeometry;
-        let progress = -Math.round(this._desktopClone.y);
-        this._desktopClone.set_clip(geometry.x,
-                                    geometry.y + progress,
-                                    geometry.width,
-                                    geometry.height - progress);
-    },
-
-    _showDesktopClone: function() {
-        let bottomMonitor = Main.layoutManager.bottomMonitor;
-        this._bottomMonitorGeometry = { x: bottomMonitor.x,
-                                        y: bottomMonitor.y,
-                                        width: bottomMonitor.width,
-                                        height: bottomMonitor.height };
-
-        if (this._desktopClone)
-            this._desktopClone.destroy();
-        let cloneSource = Main.overview.visible ? Main.layoutManager.overviewGroup : global.window_group;
-        this._desktopClone = new Clutter.Clone({ source: cloneSource,
-                                                 clip: new Clutter.Geometry(this._bottomMonitorGeometry) });
-        Main.uiGroup.insert_child_above(this._desktopClone, cloneSource);
-        this._desktopClone.x = 0;
-        this._desktopClone.y = 0;
-        this._desktopClone.show();
-
-        this._tween(this._desktopClone, '_desktopCloneState', State.SHOWN,
-                    { y: -this.actor.height,
-                      time: ANIMATION_TIME,
-                      transition: 'easeOutQuad',
-                      onUpdate: Lang.bind(this, this._updateDesktopCloneClip)
-                    });
-    },
-
-    _hideTray: function() {
-        this.emit('hiding');
-        this._tween(this.actor, '_trayState', State.HIDDEN,
-                    { y: 0,
-                      time: ANIMATION_TIME,
-                      transition: 'easeOutQuad'
-                    });
-
-        // Note that we might have entered here without a grab,
-        // which would happen if GrabHelper ungrabbed for us.
-        // This is a no-op in that case.
-        this._grabHelper.ungrab({ actor: this.actor });
-        for (let i = 0; i < this._lightboxes.length; i++)
-            this._lightboxes[i].hide(ANIMATION_TIME);
-    },
-
-    _hideDesktopClone: function() {
-        this._tween(this._desktopClone, '_desktopCloneState', State.HIDDEN,
-                    { y: 0,
-                      time: ANIMATION_TIME,
-                      transition: 'easeOutQuad',
-                      onComplete: Lang.bind(this, function() {
-                          this._desktopClone.destroy();
-                          this._desktopClone = null;
-                          this._bottomMonitorGeometry = null;
-                      }),
-                      onUpdate: Lang.bind(this, this._updateDesktopCloneClip)
-                    });
     },
 
     _onIdleMonitorBecameActive: function() {
