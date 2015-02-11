@@ -100,7 +100,8 @@ const WorldClocksSection = new Lang.Class({
         this._locations = [];
 
         this.actor = new St.Button({ style_class: 'world-clocks-button',
-                                     x_fill: true });
+                                     x_fill: true,
+                                     can_focus: true });
         this.actor.connect('clicked', Lang.bind(this,
             function() {
                 let app = this._getClockApp();
@@ -290,9 +291,6 @@ const DateMenuButton = new Lang.Class({
         this._sessionUpdated();
     },
 
-    _updateEventsVisibility: function() {
-    },
-
     _getEventSource: function() {
         return new Calendar.DBusEventSource();
     },
@@ -305,9 +303,6 @@ const DateMenuButton = new Lang.Class({
         this._messageList.setEventSource(eventSource);
 
         this._eventSource = eventSource;
-        this._eventSource.connect('notify::has-calendars', Lang.bind(this, function() {
-            this._updateEventsVisibility();
-        }));
     },
 
     _sessionUpdated: function() {
@@ -319,6 +314,5 @@ const DateMenuButton = new Lang.Class({
             eventSource = new Calendar.EmptyEventSource();
         }
         this._setEventSource(eventSource);
-        this._updateEventsVisibility();
     }
 });
