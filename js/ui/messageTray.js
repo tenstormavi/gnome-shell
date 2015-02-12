@@ -14,6 +14,7 @@ const Signals = imports.signals;
 const St = imports.gi.St;
 
 const GnomeSession = imports.misc.gnomeSession;
+const Layout = imports.ui.layout;
 const Main = imports.ui.main;
 const Params = imports.misc.params;
 const Tweener = imports.ui.tweener;
@@ -143,7 +144,7 @@ const FocusGrabber = new Lang.Class({
 const URLHighlighter = new Lang.Class({
     Name: 'URLHighlighter',
 
-    _init: function(text, lineWrap, allowMarkup) {
+    _init: function(text, allowMarkup) {
         if (!text)
             text = '';
         this.actor = new St.Label({ reactive: true, style_class: 'url-highlighter' });
@@ -158,11 +159,8 @@ const URLHighlighter = new Lang.Class({
                 }
             }
         }));
-        if (lineWrap) {
-            this.actor.clutter_text.line_wrap = true;
-            this.actor.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
-            this.actor.clutter_text.ellipsize = Pango.EllipsizeMode.NONE;
-        }
+        this.actor.clutter_text.line_wrap = true;
+        this.actor.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
 
         this.setMarkup(text, allowMarkup);
         this.actor.connect('button-press-event', Lang.bind(this, function(actor, event) {
@@ -410,6 +408,40 @@ const NotificationApplicationPolicy = new Lang.Class({
     }
 });
 
+const LabelExpanderLayout = new Lang.Class({
+    Name: 'LabelExpanderLayout',
+    Extends: Clutter.BinLayout,
+
+    _init: function(params) {
+        this._expandY = 0;
+        this.expandLines = 6;
+
+        this.parent(params);
+    },
+
+    get expandY() {
+        return this._expandY;
+    },
+
+    set expandY(v) {
+        this._expandY = v;
+        this.layout_changed();
+    },
+
+    vfunc_get_preferred_height: function(container, forWidth) {
+        let child = container.get_first_child();
+        if (!child)
+            return this.parent(container, forWidth);
+
+        let [lineMin, lineNat] = child.get_preferred_height(-1);
+        let [min, nat] = child.get_preferred_height(forWidth);
+        let [expandedMin, expandedNat] = [Math.min(min, lineMin * this.expandLines),
+                                          Math.min(nat, lineNat * this.expandLines)];
+        return [lineMin + this._expandY * (expandedMin - lineMin),
+                lineNat + this._expandY * (expandedNat - lineNat)];
+    }
+});
+
 // Notification:
 // @source: the notification's Source
 // @title: the title
@@ -466,9 +498,7 @@ const NotificationApplicationPolicy = new Lang.Class({
 const Notification = new Lang.Class({
     Name: 'Notification',
 
-    ICON_SIZE: 24,
-
-    IMAGE_SIZE: 125,
+    ICON_SIZE: 48,
 
     _init: function(source, title, banner, params) {
         this.source = source;
@@ -491,29 +521,55 @@ const Notification = new Lang.Class({
         this._soundFile = null;
         this._soundPlayed = false;
 
-        this.actor = new St.Button({ accessible_role: Atk.Role.NOTIFICATION });
-        this.actor.add_style_class_name('notification-unexpanded');
+        this.actor = new St.Button({ style_class: 'notification',
+                                     accessible_role: Atk.Role.NOTIFICATION,
+                                     x_fill: true });
         this.actor._delegate = this;
         this.actor.connect('clicked', Lang.bind(this, this._onClicked));
         this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
+        this.actor.connect('notify::hover', Lang.bind(this, this._onHoverChanged));
 
-        let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
-        this._grid = new St.Widget({ style_class: 'notification', layout_manager: layout });
-        layout.hookup_style(this._grid);
+        this._vbox = new St.BoxLayout({ vertical: true });
+        this.actor.set_child(this._vbox);
 
-        this.actor.set_child(this._grid);
+        // Using a GridLayout instead of a bunch of nested boxes would be
+        // more natural, but 
+        this._hbox = new St.BoxLayout();
+        this._vbox.add_actor(this._hbox);
+
+        this._iconBin = new St.Bin({ style_class: 'notification-icon',
+                                     y_expand: true });
+        this._iconBin.set_y_align(Clutter.ActorAlign.START);
+        this._hbox.add_actor(this._iconBin);
+
+        this._contentBox = new St.BoxLayout({ style_class: 'notification-content',
+                                              vertical: true, x_expand: true });
+        this._hbox.add_actor(this._contentBox);
+
+        let titleBox = new St.BoxLayout();
+        this._contentBox.add_actor(titleBox);
 
         this._titleLabel = new St.Label({ x_expand: true });
-        layout.attach(this._titleLabel, 1, 0, 1, 1);
+        titleBox.add_actor(this._titleLabel);
+
+        this._secondaryIcon = new St.Icon({ style_class: 'notification-secondary-icon',
+                                            visible: !this.expanded });
+        titleBox.add_actor(this._secondaryIcon);
+
         let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
-                                      icon_size: 16 });
-        this._closeButton = new St.Button({ child: closeIcon });
-        layout.attach(this._closeButton, 3, 0, 1, 1);
+                icon_size: 16 });
+        this._closeButton = new St.Button({ child: closeIcon,
+                                            visible: this.expanded });
+        titleBox.add_actor(this._closeButton);
+
+        this._bannerBodyBin = new St.Widget();
+        this._bannerBodyBin.layout_manager = new LabelExpanderLayout();
+        this._contentBox.add_actor(this._bannerBodyBin);
 
         this._closeButton.connect('clicked', Lang.bind(this,
-            function() {
-                this.destroy(NotificationDestroyedReason.DISMISSED);
-            }));
+                    function() {
+                    this.destroy(NotificationDestroyedReason.DISMISSED);
+                    }));
 
         // If called with only one argument we assume the caller
         // will call .update() later on. This is the case of
@@ -544,15 +600,11 @@ const Notification = new Lang.Class({
 
         let oldFocus = global.stage.key_focus;
 
-        if (this._icon && (params.gicon || params.clear)) {
-            this._icon.destroy();
-            this._icon = null;
-        }
+        if (this._iconBin.child && (params.gicon || params.clear))
+            this._iconBin.child.destroy();
 
-        if (this._secondaryIcon && (params.secondaryGIcon || params.clear)) {
-            this._secondaryIcon.destroy();
-            this._secondaryIcon = null;
-        }
+        if (params.clear)
+            this._secondaryIcon.gicon = null;
 
         // We always clear the content area if we don't have custom
         // content because it contains the @banner
@@ -573,24 +625,14 @@ const Notification = new Lang.Class({
             this._buttonBox = null;
         }
 
-        if (params.gicon) {
-            this._icon = new St.Icon({ gicon: params.gicon,
-                                       icon_size: this.ICON_SIZE });
-        } else {
-            this._icon = this.source.createIcon(this.ICON_SIZE);
-        }
+        if (params.gicon)
+            this._iconBin.child = new St.Icon({ gicon: params.gicon,
+                    icon_size: this.ICON_SIZE });
+        else
+            this._iconBin.cihld = this.source.createIcon(this.ICON_SIZE);
 
-        let layout = this._grid.layout_manager;
-        if (this._icon) {
-            this._icon.set_y_align(Clutter.ActorAlign.START);
-            layout.attach(this._icon, 0, 0, 1, 1);
-        }
-
-        if (params.secondaryGIcon) {
-            this._secondaryIcon = new St.Icon({ gicon: params.secondaryGIcon,
-                                                style_class: 'secondary-icon' });
-            layout.attach(this._secondaryGIcon, 2, 0, 1, 1);
-        }
+        if (params.secondaryGIcon)
+            this._secondaryIcon.gicon = params.secondaryGIcon;
 
         this.title = title;
         title = title ? _fixMarkup(title.replace(/\n/g, ' '), false) : '';
@@ -608,7 +650,8 @@ const Notification = new Lang.Class({
         // arguably for action buttons as well. Labels other than the title
         // will be allocated at the available width, so that their alignment
         // is done correctly automatically.
-        this._grid.set_text_direction(titleDirection);
+        // FIXME:
+        ////this._grid.set_text_direction(titleDirection);
 
         // Unless the notification has custom content, we save this.bannerBodyText
         // to add it to the content of the notification if the notification is
@@ -633,18 +676,14 @@ const Notification = new Lang.Class({
     },
 
     _createScrollArea: function() {
-        this._scrollArea = new St.ScrollView({ style_class: 'notification-scrollview',
-                                               vscrollbar_policy: this._scrollPolicy,
-                                               hscrollbar_policy: Gtk.PolicyType.NEVER,
-                                               visible: this.expanded });
-        let layout = this._grid.layout_manager;
-        layout.attach(this._scrollArea, 1, 1, 3, 1);
-        this._contentArea = new St.BoxLayout({ style_class: 'notification-body',
-                                               vertical: true });
-        this._scrollArea.add_actor(this._contentArea);
-        // If we know the notification will be expandable, we need to add
-        // the banner text to the body as the first element.
-        this._addBannerBody();
+         this._scrollArea = new St.ScrollView({ style_class: 'notification-scrollview',
+                 vscrollbar_policy: this._scrollPolicy,
+                 hscrollbar_policy: Gtk.PolicyType.NEVER });
+         this._contentBox.add_actor(this._scrollArea);
+
+         this._contentArea = new St.BoxLayout({ style_class: 'notification-body',
+                                                vertical: true });
+         this._scrollArea.add_actor(this._contentArea);
     },
 
     // addActor:
@@ -652,11 +691,7 @@ const Notification = new Lang.Class({
     //
     // Appends @actor to the notification's body
     addActor: function(actor, style) {
-        if (!this._scrollArea) {
-            this._createScrollArea();
-        }
-
-        this._contentArea.add(actor, style ? style : {});
+        this._contentBox.add(actor, style ? style : {});
         this.updated();
     },
 
@@ -669,7 +704,7 @@ const Notification = new Lang.Class({
     //
     // Return value: the newly-added label
     addBody: function(text, markup, style) {
-        let label = new URLHighlighter(text, true, markup);
+        let label = new URLHighlighter(text, markup);
 
         this.addActor(label.actor, style);
         return label.actor;
@@ -678,7 +713,11 @@ const Notification = new Lang.Class({
     _addBannerBody: function() {
         if (this.bannerBodyText && !this._bannerBodyAdded) {
             this._bannerBodyAdded = true;
-            this.addBody(this.bannerBodyText, this.bannerBodyMarkup);
+
+            let label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
+            label.actor.x_expand = true;
+            label.actor.x_align = Clutter.ActorAlign.START;
+            this._bannerBodyBin.add_actor(label.actor);
         }
     },
 
@@ -711,9 +750,7 @@ const Notification = new Lang.Class({
         this._actionArea = actor;
         this._actionArea.visible = this.expanded;
 
-        let layout = this._grid.layout_manager;
-        layout.attach_next_to(this._actionArea, null,
-                              Clutter.GridPosition.BOTTOM, 4, 1);
+        this._vbox.add_actor(this._actionArea);
         this.updated();
     },
 
@@ -724,6 +761,7 @@ const Notification = new Lang.Class({
             global.focus_manager.add_group(this._buttonBox);
         }
 
+        button.x_expand = true;
         this._buttonBox.add(button);
         button.connect('clicked', Lang.bind(this, function() {
             callback();
@@ -814,15 +852,26 @@ const Notification = new Lang.Class({
             this.expand(false);
     },
 
+    _onHoverChanged: function() {
+        let hovered = this.actor.hover;
+        this._secondaryIcon.visible = !hovered;
+        this._closeButton.visible = hovered;
+    },
+
     expand: function(animate) {
         this.expanded = true;
-        this.actor.remove_style_class_name('notification-unexpanded');
 
         // Show additional content that we keep hidden in banner mode
         if (this._actionArea)
             this._actionArea.show();
-        if (this._scrollArea)
-            this._scrollArea.show();
+
+        if (animate)
+            Tweener.addTween(this._bannerBodyBin.layout_manager,
+                             { expandY: 1,
+                               time: ANIMATION_TIME,
+                               transition: 'easeOutBack' });
+        else
+            this._bannerBodyBin.layout_manager.expandY = 1;
 
         this.emit('expanded');
     },
@@ -835,15 +884,13 @@ const Notification = new Lang.Class({
         // Hide additional content that we keep hidden in banner mode
         if (this._actionArea)
             this._actionArea.hide();
-        if (this._scrollArea)
-            this._scrollArea.hide();
+        if (this._bannerBodyBin)
+            Tweener.addTween(this._bannerBodyBin.layout_manager,
+                             { expandY: 0, time: 0.2 });
 
         // Make sure we don't line wrap the title, and ellipsize it instead.
         this._titleLabel.clutter_text.line_wrap = false;
         this._titleLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-
-        // Restore height requisition
-        this.actor.add_style_class_name('notification-unexpanded');
     },
 
     _onClicked: function() {
@@ -1155,20 +1202,17 @@ const MessageTray = new Lang.Class({
         }));
 
         this.actor = new St.Widget({ name: 'notification-container',
-                                     reactive: true,
-                                     track_hover: true,
-                                     y_align: Clutter.ActorAlign.START,
-                                     x_align: Clutter.ActorAlign.CENTER,
-                                     y_expand: true,
-                                     x_expand: true,
+                                     clip_to_allocation: true,
+                                     x_expand: true, y_expand: true,
                                      layout_manager: new Clutter.BinLayout() });
+        //this.actor.add_constraint(new Layout.MonitorConstraint({ primary: true, work_area: true }));
         this.actor.connect('key-release-event', Lang.bind(this, this._onNotificationKeyRelease));
-        this.actor.connect('notify::hover', Lang.bind(this, this._onNotificationHoverChanged));
 
-        this._notificationBin = new St.Bin({ y_expand: true });
+        this._notificationBin = new St.Bin({ reactive: true, track_hover: true, x_expand: true, y_expand: true });
+        this._notificationBin.connect('notify::hover', Lang.bind(this, this._onNotificationHoverChanged));
+        this._notificationBin.set_x_align(Clutter.ActorAlign.CENTER);
         this._notificationBin.set_y_align(Clutter.ActorAlign.START);
         this.actor.add_actor(this._notificationBin);
-        this.actor.hide();
         this._notificationFocusGrabber = new FocusGrabber(this.actor);
         this._notificationQueue = [];
         this._notification = null;
@@ -1198,8 +1242,9 @@ const MessageTray = new Lang.Class({
 
         this.clearableCount = 0;
 
+        //Main.layoutManager.addChrome(this.actor, { affectsInputRegion: false });
         Main.layoutManager.trayBox.add_actor(this.actor);
-        Main.layoutManager.trackChrome(this.actor);
+        //Main.layoutManager.trackChrome(this._notificationBin, { affectsInputRegion: true });
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._updateState));
 
@@ -1360,10 +1405,10 @@ const MessageTray = new Lang.Class({
     },
 
     _onNotificationHoverChanged: function() {
-        if (this.actor.hover == this._notificationHovered)
+        if (this._notificationBin.hover == this._notificationHovered)
             return;
 
-        this._notificationHovered = this.actor.hover;
+        this._notificationHovered = this._notificationBin.hover;
         if (this._notificationHovered) {
             this._resetNotificationLeftTimeout();
 
@@ -1420,11 +1465,11 @@ const MessageTray = new Lang.Class({
 
     _onNotificationLeftTimeout: function() {
         let [x, y, mods] = global.get_pointer();
-        // We extend the timeout once if the mouse moved no further than MOUSE_LEFT_ACTOR_THRESHOLD to either side or up.
+        // We extend the timeout once if the mouse moved no further than MOUSE_LEFT_ACTOR_THRESHOLD to either side or down.
         // We don't check how far down the mouse moved because any point above the tray, but below the exit coordinate,
         // is close to the tray.
         if (this._notificationLeftMouseX > -1 &&
-            y > this._notificationLeftMouseY - MOUSE_LEFT_ACTOR_THRESHOLD &&
+            y < this._notificationLeftMouseY + MOUSE_LEFT_ACTOR_THRESHOLD &&
             x < this._notificationLeftMouseX + MOUSE_LEFT_ACTOR_THRESHOLD &&
             x > this._notificationLeftMouseX - MOUSE_LEFT_ACTOR_THRESHOLD) {
             this._notificationLeftMouseX = -1;
@@ -1474,7 +1519,7 @@ const MessageTray = new Lang.Class({
                 let showNextNotification = (!limited || nextNotification.forFeedback || nextNotification.urgency == Urgency.CRITICAL);
                 if (showNextNotification) {
                     let len = this._notificationQueue.length;
-                    if (len > 1) {
+                    if (false && len > 1) {
                         this._notificationQueue.length = 0;
                         let source = new SystemNotificationSource();
                         this.add(source);
@@ -1558,9 +1603,7 @@ const MessageTray = new Lang.Class({
         }));
         this._notificationBin.child = this._notification.actor;
 
-        this.actor.opacity = 0;
-        this.actor.y = 0;
-        this.actor.show();
+        this._notificationBin.y = -this._notification.actor.height;
 
         this._updateShowingNotification();
 
@@ -1602,15 +1645,19 @@ const MessageTray = new Lang.Class({
         // We use this._showNotificationCompleted() onComplete callback to extend the time the updated
         // notification is being shown.
 
-        let tweenParams = { opacity: 255,
-                            y: -this.actor.height,
+        Tweener.addTween(this._notificationBin,
+                         { opacity: 255,
+                           time: ANIMATION_TIME,
+                           transition: 'easeOutQuad' });
+
+        let tweenParams = { y: 0,
                             time: ANIMATION_TIME,
-                            transition: 'easeOutQuad',
+                            transition: 'easeOutBack',
                             onComplete: this._showNotificationCompleted,
                             onCompleteScope: this
                           };
 
-        this._tween(this.actor, '_notificationState', State.SHOWN, tweenParams);
+        this._tween(this._notificationBin, '_notificationState', State.SHOWN, tweenParams);
    },
 
     _showNotificationCompleted: function() {
@@ -1656,7 +1703,6 @@ const MessageTray = new Lang.Class({
     },
 
     _hideNotification: function(animate) {
-    return;
         this._notificationFocusGrabber.ungrabFocus();
 
         if (this._notificationExpandedId) {
@@ -1675,18 +1721,20 @@ const MessageTray = new Lang.Class({
         this._resetNotificationLeftTimeout();
 
         if (animate) {
-            this._tween(this.actor, '_notificationState', State.HIDDEN,
-                        { y: 0,
-                          opacity: 0,
+            Tweener.addTween(this._notificationBin,
+                             { opacity: 0,
+                               time: ANIMATION_TIME,
+                               transition: 'easeOutQuad' });
+            this._tween(this._notificationBin, '_notificationState', State.HIDDEN,
+                        { y: -this._notificationBin.height,
                           time: ANIMATION_TIME,
-                          transition: 'easeOutQuad',
+                          transition: 'easeOutBack',
                           onComplete: this._hideNotificationCompleted,
                           onCompleteScope: this
                         });
         } else {
-            Tweener.removeTweens(this.actor);
-            this.actor.y = 0;
-            this.actor.opacity = 0;
+            Tweener.removeTweens(this._notificationBin);
+            this._notificationBin.y = -this._notificationBin.height;
             this._notificationState = State.HIDDEN;
             this._hideNotificationCompleted();
         }
@@ -1703,7 +1751,6 @@ const MessageTray = new Lang.Class({
         this._pointerInNotification = false;
         this._notificationRemoved = false;
         this._notificationBin.child = null;
-        this.actor.hide();
     },
 
     _expandActiveNotification: function() {
@@ -1714,40 +1761,12 @@ const MessageTray = new Lang.Class({
     },
 
     _expandNotification: function(autoExpanding) {
-        if (!this._notificationExpandedId)
-            this._notificationExpandedId =
-                this._notification.connect('expanded',
-                                           Lang.bind(this, this._onNotificationExpanded));
         // Don't animate changes in notifications that are auto-expanding.
         this._notification.expand(!autoExpanding);
 
         // Don't focus notifications that are auto-expanding.
         if (!autoExpanding)
             this._ensureNotificationFocused();
-    },
-
-    _onNotificationExpanded: function() {
-        let expandedY = - this.actor.height;
-
-        // Don't animate the notification to its new position if it has shrunk:
-        // there will be a very visible "gap" that breaks the illusion.
-        if (this.actor.y < expandedY) {
-            this.actor.y = expandedY;
-        } else if (this._notification.y != expandedY) {
-            // Tween also opacity here, to override a possible tween that's
-            // currently hiding the notification.
-            Tweener.addTween(this.actor,
-                             { y: expandedY,
-                               opacity: 255,
-                               time: ANIMATION_TIME,
-                               transition: 'easeOutQuad',
-                               // HACK: Drive the state machine here better,
-                               // instead of overwriting tweens
-                               onComplete: Lang.bind(this, function() {
-                                   this._notificationState = State.SHOWN;
-                               }),
-                             });
-        }
     },
 
     _ensureNotificationFocused: function() {
