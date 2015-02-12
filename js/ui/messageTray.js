@@ -632,10 +632,6 @@ const Notification = new Lang.Class({
         this.updated();
     },
 
-    setIconVisible: function(visible) {
-        this._icon.visible = visible;
-    },
-
     _createScrollArea: function() {
         this._scrollArea = new St.ScrollView({ style_class: 'notification-scrollview',
                                                vscrollbar_policy: this._scrollPolicy,
