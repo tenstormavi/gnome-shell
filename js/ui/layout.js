@@ -459,9 +459,8 @@ const LayoutManager = new Lang.Class({
 
         this.keyboardIndex = this.primaryIndex;
 
-        this.trayBox.set_position(this.bottomMonitor.x,
-                                  this.bottomMonitor.y + this.bottomMonitor.height);
-        this.trayBox.set_size(this.bottomMonitor.width, -1);
+        this.trayBox.set_position(this.primaryMonitor.x, this.primaryMonitor.y);
+        this.trayBox.set_size(this.primaryMonitor.width, -1);
     },
 
     _panelBoxChanged: function() {
@@ -472,6 +471,7 @@ const LayoutManager = new Lang.Class({
             if (corner)
                 corner.setBarrierSize(size);
         });
+        this.trayBox.set_y(this.panelBox.y + size);
     },
 
     _updatePanelBarrier: function() {
