@@ -1205,7 +1205,6 @@ const MessageTray = new Lang.Class({
                                      clip_to_allocation: true,
                                      x_expand: true, y_expand: true,
                                      layout_manager: new Clutter.BinLayout() });
-        //this.actor.add_constraint(new Layout.MonitorConstraint({ primary: true, work_area: true }));
         this.actor.connect('key-release-event', Lang.bind(this, this._onNotificationKeyRelease));
 
         this._notificationBin = new St.Bin({ reactive: true, track_hover: true, x_expand: true, y_expand: true });
@@ -1242,9 +1241,9 @@ const MessageTray = new Lang.Class({
 
         this.clearableCount = 0;
 
-        //Main.layoutManager.addChrome(this.actor, { affectsInputRegion: false });
         Main.layoutManager.trayBox.add_actor(this.actor);
-        //Main.layoutManager.trackChrome(this._notificationBin, { affectsInputRegion: true });
+        Main.layoutManager.trackChrome(this.actor);
+        Main.layoutManager.trackChrome(this._notificationBin);
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._updateState));
 
