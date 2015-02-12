@@ -412,7 +412,7 @@ const AutorunNotification = new Lang.Class({
                                      x_fill: true,
                                      x_align: St.Align.START,
                                      button_mask: St.ButtonMask.ONE,
-                                     style_class: 'hotplug-notification-item' });
+                                     style_class: 'notification-button' });
 
         button.connect('clicked', Lang.bind(this, function() {
             startAppForMount(app, this._mount);

@@ -418,9 +418,7 @@ StScrollBar StButton#vhandle:active {
 /* Buttons */
 
 .candidate-page-button,
-.notification-button,
 .notification-icon-button,
-.hotplug-notification-item,
 .modal-dialog-button,
 .app-view-control {
     border: 1px solid #8b8b8b;
@@ -434,17 +432,13 @@ StScrollBar StButton#vhandle:active {
 }
 
 .candidate-page-button:hover,
-.notification-button:hover,
 .notification-icon-button:hover,
-.hotplug-notification-item:hover,
 .modal-dialog-button:hover {
     background-gradient-start: rgba(255, 255, 255, 0.3);
     background-gradient-end: rgba(255, 255, 255, 0.1);
 }
 
-.notification-button:focus,
 .notification-icon-button:focus,
-.hotplug-notification-item:focus,
 .modal-dialog-button:focus,
 .app-view-control:focus {
     border-width: 2px;
@@ -457,9 +451,7 @@ StScrollBar StButton#vhandle:active {
 
 .candidate-page-button:active,
 .candidate-page-button:pressed,
-.notification-button:active,
 .notification-icon-button:active,
-.hotplug-notification-item:active,
 .modal-dialog-button:active,
 .modal-dialog-button:pressed,
 .app-view-control:checked {
@@ -468,7 +460,6 @@ StScrollBar StButton#vhandle:active {
 }
 
 .candidate-page-button:insensitive,
-.notification-button:insensitive,
 .notification-icon-button:insensitive,
 .modal-dialog-button:insensitive {
     border-color: #666666;
@@ -481,8 +472,6 @@ StScrollBar StButton#vhandle:active {
 
 .search-entry,
 .modal-dialog-button,
-.notification-button,
-.hotplug-notification-item,
 .app-view-controls,
 #screenShieldNotifications {
     border-radius: 18px;
@@ -1576,16 +1565,6 @@ StScrollBar StButton#vhandle:active {
     background-color: #4c4c4c;
 }
 
-.notification-banner {
-    border-radius: 5px;
-    background: rgba(0,0,0,0.9);
-    padding: 8px;
-    margin: 5px;
-    spacing-rows: 4px;
-    spacing-columns: 10px;
-    font-size: 11pt;
-    width: 34em;
-}
 
 /* Message Tray */
 
@@ -1594,11 +1573,19 @@ StScrollBar StButton#vhandle:active {
 }
 
 .notification {
-    border-radius: 10px 10px 0px 0px;
-    background: rgba(0,0,0,0.9);
-    padding: 8px 8px 4px 8px;
-    spacing-rows: 4px;
-    spacing-columns: 10px;
+    border-radius: 5px;
+    margin: 5px;
+    background-color: rgb(72,72,72);
+    border: 1px solid rgb(35,40,41);
+}
+
+.notification-icon {
+    padding: 5px;
+}
+
+.notification-content {
+    padding: 5px;
+    spacing: 5px;
 }
 
 .notification, #notification-container {
@@ -1624,17 +1611,25 @@ StScrollBar StButton#vhandle:active {
 }
 
 .notification-actions {
-    padding-top: 18px;
-    spacing: 10px;
+    background-color: rgb(35,40,41);
+    padding-top: 2px;
+    spacing: 1px;
 }
 
 .notification-button {
-    -st-natural-width: 140px;
+    background-color: rgb(58,58,58);
     padding: 4px 4px 5px;
 }
 
+.notification-button:first-child {
+    border-radius: 0 0 0 5px;
+}
+
+.notification-button:last-child {
+    border-radius: 0 0 5px 0;
+}
+
 .notification-button:focus {
-    -st-natural-width: 138px;
     padding: 3px 4px 4px;
 }
 
@@ -1653,15 +1648,7 @@ StScrollBar StButton#vhandle:active {
 }
 
 .secondary-icon {
-    icon-size: 1.09em;
-}
-
-.hotplug-notification-item {
-    padding: 2px 10px;
-}
-
-.hotplug-notification-item:focus {
-    padding: 1px 71px 1px 11px;
+    icon-size: 16px;
 }
 
 .hotplug-notification-item-icon {
