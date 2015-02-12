@@ -1039,7 +1039,7 @@ const NotificationListEntry = new Lang.Class({
     Extends: MessageListEntry,
 
     _init: function(notification) {
-        let params = { gicon: notification.icon || notification.getIcon() };
+        let params = { gicon: notification.icon || notification.source.getIcon() };
         if (!this._noDate)
             params.time = new Date();
 
@@ -1204,7 +1204,17 @@ const NotificationSection = new Lang.Class({
     },
 
     _onNotificationAdded: function(source, notification) {
-        let gicon = notification._icon ? notification._icon.gicon : source.getIcon();
+        //let gicon = notification._icon ? notification._icon.gicon : source.getIcon();
+        let gicon = null;
+        if (notification._iconBin.child)
+            gicon = notification._iconBin.child.gicon;
+
+        if (!gicon)
+            try {
+                gicon = source.getIcon();
+            } catch(e) {
+            }
+
         let body = '';
         if (notification.bannerBodyText) {
             body = notification.bannerBodyMarkup ? notification.bannerBodyText
@@ -1257,6 +1267,13 @@ const NotificationSection = new Lang.Class({
         let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
         if (!limited || notification.forFeedback || notification.priority == Gio.NotificationPriority.URGENT)
             this._showBanner();
+    },
+
+    showTestBanner: function() {
+        let notification = new Notification(new Source('Test', 'dialog-info-symbolic'),
+                                            "Test notification",
+                                            "This is a small test notification with a lengthy body to test expanding of banners; something's wrong in the tray but seems to work here, no idea what's going on ...");
+        this.addNotification(notification);
     },
 
     _showBanner: function() {
