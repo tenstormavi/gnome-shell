@@ -1184,21 +1184,15 @@ const NotificationSection = new Lang.Class({
 
     _sourceAdded: function(tray, source) {
         let obj = {
-            sourceTitleChangedId: 0,
-            sourceDestroyId: 0,
-            sourceNotificationAdded: 0,
+            destroyId: 0,
+            notificationAddedId: 0,
         };
 
-/*
-        obj.sourceTitleChangedId = source.connect('title-changed', Lang.bind(this, function(source) {
-            this._titleChanged(source, obj);
-        }));
-        obj.sourceDestroyId = source.connect('destroy', Lang.bind(this, function(source) {
+        obj.destroyId = source.connect('destroy', Lang.bind(this, function(source) {
             this._onSourceDestroy(source, obj);
         }));
-        */
-        obj.sourceNotificationAdded = source.connect('notification-added',
-                                                     Lang.bind(this, this._onNotificationAdded));
+        obj.notificationAddedId = source.connect('notification-added',
+                                                 Lang.bind(this, this._onNotificationAdded));
 
         this._sources.set(source, obj);
     },
@@ -1223,6 +1217,13 @@ const NotificationSection = new Lang.Class({
         let listEntry = new MessageListEntry(notification.title, body, { gicon: gicon, time: new Date() });
         // TODO: Keep URGENT notifications on top
         this._list.insert_child_below(listEntry.actor, null);
+    },
+
+    _onSourceDestroy: function(source, obj) {
+        source.disconnect(obj.destroyId);
+        source.disconnect(obj.notificationAddedId);
+
+        this._sources.delete(source);
     },
 
     addNotification: function(notification) {
