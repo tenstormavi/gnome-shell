@@ -3,6 +3,7 @@
 const Clutter = imports.gi.Clutter;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
+const Gtk = imports.gi.Gtk;
 const Lang = imports.lang;
 const St = imports.gi.St;
 const Signals = imports.signals;
@@ -916,10 +917,13 @@ const MessageListEntry = new Lang.Class({
         this._closeButton.connect('clicked', Lang.bind(this,
             function() {
                 this.emit('close');
-                this.actor.destroy();
             }));
         this.actor.connect('notify::hover', Lang.bind(this, this._sync));
         this._sync();
+    },
+
+    canClear: function() {
+        return true;
     },
 
     _sync: function() {
@@ -935,6 +939,7 @@ const MessageListSection = new Lang.Class({
 
     _init: function(title) {
         this.actor = new St.BoxLayout({ style_class: 'message-list-section',
+                                        clip_to_allocation: true,
                                         x_expand: true, vertical: true });
         let titleBox = new St.BoxLayout({ style_class: 'message-list-section-title-box' });
         this.actor.add_actor(titleBox);
@@ -976,8 +981,71 @@ const MessageListSection = new Lang.Class({
         }
     },
 
+    addMessage: function(message, animate) {
+        let bin = new St.Widget({ layout_manager: new ScaleLayout(),
+                                  pivot_point: new Clutter.Point({ x: 0.5, y: 0.5 }) });
+        bin._delegate = message;
+        message.actor.connect('destroy', function() { bin.destroy(); });
+        message.connect('close', Lang.bind(this, this.removeMessage, true));
+
+        bin.add_actor(message.actor);
+        this._list.add_actor(bin);
+
+        if (animate) {
+            bin.scale_y = bin.scale_x = 0;
+            Tweener.addTween(bin, { scale_x: 1,
+                                    scale_y: 1,
+                                    time: MessageTray.ANIMATION_TIME,
+                                    transition: 'easeOutQuad' });
+        }
+
+        return bin;
+    },
+
+    removeMessage: function(message, animate) {
+        let bin = message.actor.get_parent();
+
+        if (animate)
+            Tweener.addTween(bin, { scale_x: 0,
+                                    scale_y: 0,
+                                    time: MessageTray.ANIMATION_TIME,
+                                    transition: 'easeOutQuad',
+                                    onComplete: function() { bin.destroy(); } });
+        else
+            bin.destroy();
+    },
+
+    get _messages() {
+        return this._list.get_children().map(function(a) { return a._delegate; });
+    },
+
+    _tweenMessages: function(messages, params, onComplete) {
+        if (Array.isArray(messages)) {
+            for (let i = 0; i < messages.length; i++) {
+                if (i == messages.length - 1)
+                    params.onComplete = onComplete;
+                params.delay = i * 0.1;
+                Tweener.addTween(messages[i].actor.get_parent(), params);
+            }
+        } else {
+            params.onComplete = onComplete;
+            Tweener.addTween(messages.actor.get_parent(), params);
+        }
+    },
+
     clear: function() {
-        this._list.destroy_all_children();
+        let messages = this._messages.filter(function(m) { return m.canClear(); });
+        this._tweenMessages(messages,
+                            { anchor_x: this._list.width,
+                              time: MessageTray.ANIMATION_TIME,
+                              transition: 'easeOutQuad' },
+                            function() {
+                                messages.forEach(function(m) { m.actor.get_parent().destroy(); });
+                            });
+    },
+
+    _canClear: function() {
+        return this._messages.some(function(m) { return m.canClear(); });
     },
 
     isEmpty: function() {
@@ -991,6 +1059,7 @@ const MessageListSection = new Lang.Class({
 
     _sync: function() {
         this.actor.visible = !this.isEmpty() && this._isToday();
+        this._closeButton.visible = this._canClear();
     }
 });
 
@@ -1215,8 +1284,14 @@ const NotificationSection = new Lang.Class({
                                                  : GLib.markup_escape_text(notification.bannerBodyText, -1);
         }
         let listEntry = new MessageListEntry(notification.title, body, { gicon: gicon, time: new Date() });
+        listEntry.actor.connect('clicked', function() { notification._onClicked(); });
+        notification.connect('destroy', Lang.bind(this, function() {
+            this.removeMessage(listEntry, this.actor.mapped);
+        }));
+        listEntry.connect('close', function() { notification.destroy(); });
+        let listChild = this.addMessage(listEntry, this.actor.mapped);
         // TODO: Keep URGENT notifications on top
-        this._list.insert_child_below(listEntry.actor, null);
+        this._list.set_child_below_sibling(listChild, null);
     },
 
     _onSourceDestroy: function(source, obj) {
@@ -1365,7 +1440,7 @@ const EventsSection = new Lang.Class({
 
         this._reloading = true;
 
-        this.clear();
+        this._list.destroy_all_children();
 
         let periodBegin = _getBeginningOfDay(this._date);
         let periodEnd = _getEndOfDay(this._date);
@@ -1492,19 +1567,24 @@ const MessageList = new Lang.Class({
     Name: 'MessageList',
 
     _init: function() {
-        this.actor = new St.Widget({ style_class: 'events-table',
+        this.actor = new St.Widget({ style_class: 'message-list',
                                      layout_manager: new Clutter.BinLayout(),
                                      x_expand: true, y_expand: true });
 
         this._placeholder = new Placeholder();
         this.actor.add_actor(this._placeholder.actor);
 
-        this._scrollView = new St.ScrollView({ x_expand: true, y_expand: true,
-                                               y_align: Clutter.ActorAlign.START });
+        this._scrollView = new St.ScrollView({ style_class: 'vfade',
+                                               overlay_scrollbars: true,
+                                               x_expand: true, y_expand: true,
+                                               x_fill: true, y_fill: true });
+        this._scrollView.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
         this.actor.add_actor(this._scrollView);
 
         this._sectionList = new St.BoxLayout({ style_class: 'message-list-sections',
-                                               vertical: true });
+                                               vertical: true,
+                                               y_expand: true,
+                                               y_align: Clutter.ActorAlign.START });
         this._scrollView.add_actor(this._sectionList);
         this._sections = [];
 
@@ -1525,8 +1605,8 @@ const MessageList = new Lang.Class({
     },
 
     _sync: function() {
-        let visible = this._sections.every(function(s) { return s.isEmpty() || !s.actor.visible });
-        this._placeholder.actor.visible = visible;
+        let showPlaceholder = this._sections.every(function(s) { return s.isEmpty() || !s.actor.visible });
+        this._placeholder.actor.visible = showPlaceholder;
     },
 
     setEventSource: function(eventSource) {
