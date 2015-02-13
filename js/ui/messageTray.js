@@ -28,6 +28,8 @@ const NOTIFICATION_TIMEOUT = 4;
 const HIDE_TIMEOUT = 0.2;
 const LONGER_HIDE_TIMEOUT = 0.6;
 
+const MAX_NOTIFICATIONS_PER_SOURCE = 3;
+
 // We delay hiding of the tray if the mouse is within MOUSE_LEFT_ACTOR_THRESHOLD
 // range from the point where it left the tray.
 const MOUSE_LEFT_ACTOR_THRESHOLD = 20;
@@ -1130,6 +1132,9 @@ const Source = new Lang.Class({
     pushNotification: function(notification) {
         if (this.notifications.indexOf(notification) >= 0)
             return;
+
+        while (this.notifications.length >= MAX_NOTIFICATIONS_PER_SOURCE)
+            this.notifications.shift().destroy(NotificationDestroyedReason.EXPIRED);
 
         notification.connect('destroy', Lang.bind(this, this._onNotificationDestroy));
         this.notifications.push(notification);
