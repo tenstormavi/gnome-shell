@@ -1383,10 +1383,6 @@ const MessageTray = new Lang.Class({
             this._notificationQueue.splice(index, 1);
     },
 
-    hide: function() {
-        this._updateState();
-    },
-
     _onNotify: function(source, notification) {
         if (this._notification == notification) {
             // If a notification that is being shown is updated, we update
