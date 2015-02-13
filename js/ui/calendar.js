@@ -984,13 +984,13 @@ const MessageListSection = new Lang.Class({
         return this._list.get_n_children() == 0;
     },
 
-    _shouldShowForDate: function() {
+    _isToday: function() {
         let today = new Date();
         return _sameDay(this._date, today);
     },
 
     _sync: function() {
-        this.actor.visible = !this.isEmpty() && this._shouldShowForDate();
+        this.actor.visible = !this.isEmpty() && this._isToday();
     }
 });
 
@@ -1362,14 +1362,13 @@ const EventsSection = new Lang.Class({
         if (this._eventSource.isLoading)
             return;
 
+        this._reloading = true;
+
         this.clear();
 
         let periodBegin = _getBeginningOfDay(this._date);
         let periodEnd = _getEndOfDay(this._date);
         let events = this._eventSource.getEvents(periodBegin, periodEnd);
-
-        if (events.length == 0)
-            return;
 
         let clockFormat = this._desktopSettings.get_string(CLOCK_FORMAT_KEY);
         for (let i = 0; i < events.length; i++) {
@@ -1390,8 +1389,11 @@ const EventsSection = new Lang.Class({
                     title = title + ELLIPSIS_CHAR;
             }
             let eventEntry = new MessageListEntry(title, event.summary);
-            this._list.add(eventEntry.actor);
+            this.addMessage(eventEntry, false);
         }
+
+        this._reloading = false;
+        this._sync();
     },
 
     _appInstalledChanged: function() {
@@ -1427,13 +1429,12 @@ const EventsSection = new Lang.Class({
     },
 
     _sync: function() {
-        this.actor.visible = !this.isEmpty() || !_sameDay(this._date, new Date());
+        if (this._reloading)
+            return;
+
+        this.actor.visible = !this.isEmpty() || !this._isToday();
         this._closeButton.visible = !this.isEmpty();
         this._updateTitle();
-    },
-
-    _shouldShowForDate: function() {
-        return true;
     }
 });
 
