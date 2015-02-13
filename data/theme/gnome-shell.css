@@ -1294,9 +1294,69 @@ StScrollBar StButton#vhandle:active {
 
 /* Calendar popup */
 
-.calendar {
-    padding: .4em 1.75em .8em 1.75em;
+#calendarArea {
+    padding: 0.75em 1.0em;
 }
+
+.datemenu-today-button,
+.calendar,
+.datemenu-displays-box,
+.message-list-sections {
+    margin: 0 1.5em;
+}
+
+.datemenu-calendar-column {
+    spacing: 0.5em;
+    padding-bottom: 3em;
+}
+
+.calendar {
+    margin-bottom: 1em;
+}
+
+.message-list-section-title,
+.datemenu-today-button,
+.world-clocks-button {
+    border-radius: 4px;
+    padding: .4em;
+}
+
+.message-list-section-title:hover,
+.datemenu-today-button:hover,
+.world-clocks-button:hover {
+    background-color: rgb(46,52,54);
+}
+
+.message-list-section-title:focus,
+.datemenu-today-button:focus,
+.world-clocks-button:focus {
+    background-color: rgb(46,52,54);
+}
+
+.message-list-section-title:active,
+.datemenu-today-button:active,
+.world-clocks-button:active {
+    background-color: rgb(40,46,48);
+}
+
+.datemenu-today-button .day-label {
+}
+
+.datemenu-today-button .date-label {
+    font-size: 1.5em;
+}
+
+.world-clocks-header,
+.message-list-section-title {
+    color: rgb(136,138,133);
+    font-weight: bold;
+}
+
+.world-clocks-grid {
+    spacing-rows: 0.4em;
+}
+
+/* Calendar */
 
 .calendar-month-label {
     color: #888a85;
@@ -1345,42 +1405,6 @@ StScrollBar StButton#vhandle:active {
     background-color: #999999;
 }
 .calendar-change-month-forward:active {
-    background-color: #aaaaaa;
-}
-
-.world-clocks-button {
-    border-radius: 4px;
-    margin: 6px;
-}
-
-.world-clocks-button:hover,
-.world-clocks-button:focus {
-    background-color: #999999;
-}
-
-.world-clocks-header {
-    color: #888a85;
-}
-
-.datemenu-today-button {
-    padding: .4em 1.7em;
-    color: #eeeeec;
-    border-radius: 4px;
-}
-
-.datemenu-today-button .day-label {
-}
-
-.datemenu-today-button .date-label {
-    font-size: 1.5em;
-}
-
-.datemenu-today-button:hover,
-.datemenu-today-button:focus {
-    background-color: #999999;
-}
-
-.datemenu-today-button:active {
     background-color: #aaaaaa;
 }
 
@@ -1451,21 +1475,6 @@ StScrollBar StButton#vhandle:active {
     color: #333333;
 }
 
-.events-table {
-    width: 320px;
-    spacing-columns: 6pt;
-    spacing-rows: 6pt;
-    padding: 0 1.4em;
-}
-
-.events-table:ltr {
-    padding-right: 1.9em;
-}
-
-.events-table:rtl {
-    padding-left: 1.9em;
-}
-
 .event-button {
     background-color: #2c2c2c;
     padding: 6px;
@@ -1532,20 +1541,23 @@ StScrollBar StButton#vhandle:active {
     padding-right: 8pt;
 }
 
-.message-list-sections,
+/* Message list */
+
+.message-list {
+    width: 320px;
+}
+
+.message-list-sections {
+    spacing: 1.5em;
+}
+
 .message-list-section,
-.message-list-section-title-box,
 .message-list-section-list {
-    spacing: 6px;
+    spacing: 0.7em;
 }
 
-.message-list-section-title {
-    padding: 2px;
-    border-radius: 4px;
-}
-
-.message-list-section-title:hover {
-    background-color: #999999;
+.message-list-section-title-box {
+    spacing: 0.4em;
 }
 
 .message-list-section-close > StIcon {
