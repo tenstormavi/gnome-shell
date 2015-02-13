@@ -1404,6 +1404,7 @@ const MessageTray = new Lang.Class({
     },
 
     _onNotificationHoverChanged: function() {
+        global.sync_pointer();
         if (this._notificationBin.hover == this._notificationHovered)
             return;
 
