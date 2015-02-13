@@ -629,7 +629,7 @@ const Notification = new Lang.Class({
             this._iconBin.child = new St.Icon({ gicon: params.gicon,
                     icon_size: this.ICON_SIZE });
         else
-            this._iconBin.cihld = this.source.createIcon(this.ICON_SIZE);
+            this._iconBin.child = this.source.createIcon(this.ICON_SIZE);
 
         if (params.secondaryGIcon)
             this._secondaryIcon.gicon = params.secondaryGIcon;
