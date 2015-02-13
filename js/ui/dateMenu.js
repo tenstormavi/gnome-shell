@@ -4,6 +4,7 @@ const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
 const GnomeDesktop = imports.gi.GnomeDesktop;
 const GObject = imports.gi.GObject;
+const Gtk = imports.gi.Gtk;
 const GWeather = imports.gi.GWeather;
 const Lang = imports.lang;
 const Mainloop = imports.mainloop;
@@ -90,6 +91,9 @@ const WorldClocksSection = new Lang.Class({
             function() {
                 let app = this._getClockApp();
                 app.activate();
+
+                Main.overview.hide();
+                Main.panel.closeCalendar();
             }));
 
         let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
@@ -245,7 +249,7 @@ const DateMenuButton = new Lang.Class({
         let hbox;
         let vbox;
 
-        let menuAlignment = 0.25;
+        let menuAlignment = 0.5;
         if (Clutter.get_default_text_direction() == Clutter.TextDirection.RTL)
             menuAlignment = 1.0 - menuAlignment;
         this.parent(menuAlignment);
@@ -262,43 +266,48 @@ const DateMenuButton = new Lang.Class({
         hbox = new St.BoxLayout({ name: 'calendarArea' });
         bin.add_actor(hbox);
 
-        // Fill up the first column
-        this._messageList = new Calendar.MessageList();
-        hbox.add(this._messageList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
+        this._calendar = new Calendar.Calendar();
+        this._calendar.connect('selected-date-changed',
+                               Lang.bind(this, function(calendar, date) {
+                                   layout.frozen = !_isToday(date);
+                                   this._messageList.setDate(date);
+                               }));
 
         // Whenever the menu is opened, select today
         this.menu.connect('open-state-changed', Lang.bind(this, function(menu, isOpen) {
             if (isOpen) {
                 let now = new Date();
-                layout.frozen = false;
                 this._calendar.setDate(now);
                 this._date.setDate(now);
             }
         }));
 
+        // Fill up the first column
+        this._messageList = new Calendar.MessageList();
+        hbox.add(this._messageList.actor, { expand: true, y_fill: false, y_align: St.Align.START });
+
         // Fill up the second column
-        vbox = new St.BoxLayout({vertical: true});
+        vbox = new St.BoxLayout({ style_class: 'datemenu-calendar-column',
+                                  vertical: true });
         hbox.add(vbox);
 
-        this._calendar = new Calendar.Calendar();
-
-        // Date
         this._date = new TodayButton(this._calendar);
-        vbox.add(this._date.actor, { x_fill: false  });
+        vbox.add(this._date.actor, { x_fill: true  });
 
-        this._calendar.connect('selected-date-changed',
-                               Lang.bind(this, function(calendar, date) {
-                                  layout.frozen = !_isToday(date);
-                                  // we know this._messageList is defined here, because selected-data-changed
-                                  // only gets emitted when the user clicks a date in the calendar,
-                                  // and the calender makes those dates unclickable when instantiated with
-                                  // a null event source
-                                   this._messageList.setDate(date);
-                               }));
         vbox.add(this._calendar.actor);
 
+        let scroll = new St.ScrollView({ style_class: 'vfade',
+                                         x_expand: true, x_fill: true,
+                                         overlay_scrollbars: true });
+        scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
+        vbox.add(scroll);
+
+        let displaysBox = new St.BoxLayout({ vertical: true,
+                                             style_class: 'datemenu-displays-box' });
+        scroll.add_actor(displaysBox);
+
         this._clocksItem = new WorldClocksSection();
-        vbox.add(this._clocksItem.actor);
+        displaysBox.add(this._clocksItem.actor, { x_fill: true });
 
 
         // Done with hbox for calendar and event list
