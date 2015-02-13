@@ -933,7 +933,7 @@ Signals.addSignalMethods(MessageListEntry.prototype);
 const MessageListSection = new Lang.Class({
     Name: 'MessageListSection',
 
-    _init: function(title, callback) {
+    _init: function(title) {
         this.actor = new St.BoxLayout({ style_class: 'message-list-section',
                                         x_expand: true, vertical: true });
         let titleBox = new St.BoxLayout({ style_class: 'message-list-section-title-box' });
@@ -941,7 +941,6 @@ const MessageListSection = new Lang.Class({
 
         let hasCallback = typeof callback == 'function';
         this._title = new St.Button({ style_class: 'message-list-section-title',
-                                      reactive: hasCallback,
                                       label: title,
                                       x_expand: true,
                                       x_align: St.Align.START });
@@ -957,16 +956,17 @@ const MessageListSection = new Lang.Class({
                                         vertical: true });
         this.actor.add_actor(this._list);
 
-        this._title.connect('clicked', Lang.bind(this,
-            function() {
-                if (hasCallback)
-                    callback();
-            }));
+        this._title.connect('clicked', Lang.bind(this, this._onTitleClicked));
         this._closeButton.connect('clicked', Lang.bind(this, this.clear));
         this._list.connect('actor-added', Lang.bind(this, this._sync));
         this._list.connect('actor-removed', Lang.bind(this, this._sync));
         this._date = new Date();
         this._sync();
+    },
+
+    _onTitleClicked: function() {
+        Main.overview.hide();
+        Main.panel.closeCalendar();
     },
 
     setDate: function(date) {
@@ -1161,7 +1161,7 @@ const NotificationSection = new Lang.Class({
     Extends: MessageListSection,
 
     _init: function() {
-        this.parent('Notifications', Lang.bind(this, this._openSettings));
+        this.parent('Notifications');
 
         this._notificationQueue = [];
 
@@ -1300,7 +1300,9 @@ const NotificationSection = new Lang.Class({
                                                onComplete: Lang.bind(this, function() { this._banner.actor.destroy(); }) });
     },
 
-    _openSettings: function() {
+    _onTitleClicked: function() {
+        this.parent();
+
         let app = Shell.AppSystem.get_default().lookup_app('gnome-notifications-panel.desktop');
 
         if (!app) {
@@ -1308,8 +1310,6 @@ const NotificationSection = new Lang.Class({
             return;
         }
 
-        Main.overview.hide();
-        Main.panel.closeCalendar();
         app.activate();
     },
 
@@ -1328,7 +1328,7 @@ const EventsSection = new Lang.Class({
         this._desktopSettings.connect('changed', Lang.bind(this, this._reloadEvents));
         this._eventSource = new EmptyEventSource();
 
-        this.parent('', Lang.bind(this, this._openCalendar));
+        this.parent('');
 
         Shell.AppSystem.get_default().connect('installed-changed',
                                               Lang.bind(this, this._appInstalledChanged));
@@ -1417,13 +1417,12 @@ const EventsSection = new Lang.Class({
         return this._calendarApp;
     },
 
-    _openCalendar: function() {
+    _onTitleClicked: function() {
+        this.parent();
+
         let app = this._getCalendarApp();
         if (app.get_id() == 'evolution.desktop')
             app = Gio.DesktopAppInfo.new('evolution-calendar.desktop');
-
-        Main.panel.closeCalendar();
-        Main.overview.hide();
         app.launch([], global.create_app_launch_context(0, -1));
     },
 
