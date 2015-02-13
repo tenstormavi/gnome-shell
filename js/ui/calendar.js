@@ -1092,14 +1092,16 @@ const ScaleLayout = new Lang.Class({
         this._connectContainer(container);
 
         let [min, nat] = this.parent(container, forHeight);
-        return [min * container.scale_x, nat * container.scale_x];
+        return [Math.floor(min * container.scale_x),
+                Math.floor(nat * container.scale_x)];
     },
 
     vfunc_get_preferred_height: function(container, forWidth) {
         this._connectContainer(container);
 
         let [min, nat] = this.parent(container, forWidth);
-        return [min * container.scale_y, nat * container.scale_y];
+        return [Math.floor(min * container.scale_y),
+                Math.floor(nat * container.scale_y)];
     }
 });
 
