@@ -1309,6 +1309,7 @@ const NotificationSection = new Lang.Class({
         }
 
         Main.overview.hide();
+        Main.panel.closeCalendar();
         app.activate();
     },
 
@@ -1420,6 +1421,9 @@ const EventsSection = new Lang.Class({
         let app = this._getCalendarApp();
         if (app.get_id() == 'evolution.desktop')
             app = Gio.DesktopAppInfo.new('evolution-calendar.desktop');
+
+        Main.panel.closeCalendar();
+        Main.overview.hide();
         app.launch([], global.create_app_launch_context(0, -1));
     },
 
