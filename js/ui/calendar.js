@@ -1297,9 +1297,14 @@ const NotificationSection = new Lang.Class({
         if (this.mapped)
             notification.acknowledged = true;
 
+        let children = this._list.get_children();
+        let index;
+        for (index = 0; index < children.length; index++)
+            if (children[index]._delegate.notification.urgency <= notification.urgency)
+                break;
+
         let listChild = this.addMessage(listEntry, this.actor.mapped);
-        // TODO: Keep URGENT notifications on top
-        this._list.set_child_below_sibling(listChild, null);
+        this._list.set_child_at_index(listChild, index);
     },
 
     _onSourceDestroy: function(source, obj) {
