@@ -1249,6 +1249,8 @@ const NotificationSection = new Lang.Class({
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._checkQueue));
 
+        this.actor.connect('notify::mapped', Lang.bind(this, this._onMapped));
+
         Main.sessionMode.connect('updated', Lang.bind(this, this._sessionUpdated));
         this._sessionUpdated();
     },
@@ -1291,6 +1293,7 @@ const NotificationSection = new Lang.Class({
             this.removeMessage(listEntry, this.actor.mapped);
         }));
         listEntry.connect('close', function() { notification.destroy(); });
+        listEntry.notification = notification;
         let listChild = this.addMessage(listEntry, this.actor.mapped);
         // TODO: Keep URGENT notifications on top
         this._list.set_child_below_sibling(listChild, null);
@@ -1301,6 +1304,14 @@ const NotificationSection = new Lang.Class({
         source.disconnect(obj.notificationAddedId);
 
         this._sources.delete(source);
+    },
+
+    _onMapped: function() {
+        if (!this.actor.mapped)
+            return;
+        this._messages.forEach(function(m) {
+            m.notification.acknowledged = true;
+        });
     },
 
     addNotification: function(notification) {
