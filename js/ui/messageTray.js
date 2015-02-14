@@ -29,6 +29,7 @@ const HIDE_TIMEOUT = 0.2;
 const LONGER_HIDE_TIMEOUT = 0.6;
 
 const MAX_NOTIFICATIONS_PER_SOURCE = 3;
+const MAX_NOTIFICATIONS_IN_QUEUE = 3;
 
 // We delay hiding of the tray if the mouse is within MOUSE_LEFT_ACTOR_THRESHOLD
 // range from the point where it left the tray.
@@ -1416,12 +1417,18 @@ const MessageTray = new Lang.Class({
             // we stop hiding it and show it again.
             this._updateShowingNotification();
         } else if (this._notificationQueue.indexOf(notification) < 0) {
-            notification.connect('destroy',
-                                 Lang.bind(this, this._onNotificationDestroy));
-            this._notificationQueue.push(notification);
-            this._notificationQueue.sort(function(notification1, notification2) {
-                return (notification2.urgency - notification1.urgency);
-            });
+            // If the queue is "full", we skip banner mode and just show a small
+            // indicator in the panel; however do make an exception for CRITICAL
+            // notifications, as only banner mode allows expansion.
+            let full = (this._notificationQueue.length >= MAX_NOTIFICATIONS_IN_QUEUE);
+            if (!full || notification.urgency == Urgency.CRITICAL) {
+                notification.connect('destroy',
+                                     Lang.bind(this, this._onNotificationDestroy));
+                this._notificationQueue.push(notification);
+                this._notificationQueue.sort(function(notification1, notification2) {
+                    return (notification2.urgency - notification1.urgency);
+                });
+            }
         }
         this._updateState();
     },
