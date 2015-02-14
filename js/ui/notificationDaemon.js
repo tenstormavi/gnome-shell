@@ -592,6 +592,7 @@ const FdoNotificationDaemonSource = new Lang.Class({
 
         this.app.activate();
         Main.overview.hide();
+        Main.panel.closeCalendar();
     },
 
     destroy: function() {
