@@ -512,7 +512,7 @@ const Notification = new Lang.Class({
         this.forFeedback = false;
         this.expanded = false;
         this.focused = false;
-        this.acknowledged = false;
+        this._acknowledged = false;
         this._destroyed = false;
         this._customContent = false;
         this.bannerBodyText = null;
@@ -795,6 +795,17 @@ const Notification = new Lang.Class({
                                      can_focus: true });
 
         return this.addButton(button, callback);
+    },
+
+    get acknowledged() {
+        return this._acknowledged;
+    },
+
+    set acknowledged(v) {
+        if (this._acknowledged == v)
+            return;
+        this._acknowledged = v;
+        this.emit('acknowledged-changed');
     },
 
     setUrgency: function(urgency) {
@@ -1137,6 +1148,7 @@ const Source = new Lang.Class({
             this.notifications.shift().destroy(NotificationDestroyedReason.EXPIRED);
 
         notification.connect('destroy', Lang.bind(this, this._onNotificationDestroy));
+        notification.connect('acknowledged-changed', Lang.bind(this, this.countUpdated));
         this.notifications.push(notification);
         this.emit('notification-added', notification);
 
