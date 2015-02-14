@@ -1233,7 +1233,6 @@ const MessageTray = new Lang.Class({
             }));
 
         this.actor = new St.Widget({ name: 'notification-container',
-                                     clip_to_allocation: true,
                                      x_expand: true, y_expand: true,
                                      layout_manager: new Clutter.BinLayout() });
         this.actor.connect('key-release-event', Lang.bind(this, this._onNotificationKeyRelease));

@@ -243,6 +243,7 @@ const LayoutManager = new Lang.Class({
                               Lang.bind(this, this._panelBoxChanged));
 
         this.trayBox = new St.Widget({ name: 'trayBox',
+                                       clip_to_allocation: true,
                                        layout_manager: new Clutter.BinLayout() }); 
         this.addChrome(this.trayBox, { affectsInputRegion: false });
 
