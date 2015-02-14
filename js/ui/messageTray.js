@@ -1201,6 +1201,18 @@ const MessageTray = new Lang.Class({
             this._onStatusChanged(status);
         }));
 
+        global.stage.connect('enter-event', Lang.bind(this,
+            function(a, ev) {
+                // HACK: St uses ClutterInputDevice for hover tracking, which
+                // misses relevant X11 events when untracked actors are
+                // involved (read: the notification banner in normal mode),
+                // so fix up Clutter's view of the pointer position in
+                // that case.
+                let related = ev.get_related();
+                if (!related || this.actor.contains(related))
+                    global.sync_pointer();
+            }));
+
         this.actor = new St.Widget({ name: 'notification-container',
                                      clip_to_allocation: true,
                                      x_expand: true, y_expand: true,
@@ -1404,7 +1416,6 @@ const MessageTray = new Lang.Class({
     },
 
     _onNotificationHoverChanged: function() {
-        global.sync_pointer();
         if (this._notificationBin.hover == this._notificationHovered)
             return;
 
