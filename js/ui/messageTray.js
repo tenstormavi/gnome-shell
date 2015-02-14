@@ -1274,7 +1274,7 @@ const MessageTray = new Lang.Class({
 
         Main.layoutManager.trayBox.add_actor(this.actor);
         Main.layoutManager.trackChrome(this.actor);
-        Main.layoutManager.trackChrome(this._notificationBin);
+        Main.layoutManager.trackChrome(this._notificationBin, { affectsInputRegion: true });
 
         global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._updateState));
 
