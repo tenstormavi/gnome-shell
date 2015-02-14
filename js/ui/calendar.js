@@ -1294,6 +1294,9 @@ const NotificationSection = new Lang.Class({
         }));
         listEntry.connect('close', function() { notification.destroy(); });
         listEntry.notification = notification;
+        if (this.mapped)
+            notification.acknowledged = true;
+
         let listChild = this.addMessage(listEntry, this.actor.mapped);
         // TODO: Keep URGENT notifications on top
         this._list.set_child_below_sibling(listChild, null);
