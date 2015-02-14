@@ -1301,7 +1301,7 @@ const NotificationSection = new Lang.Class({
         }));
         listEntry.connect('close', function() { notification.destroy(); });
         listEntry.notification = notification;
-        if (this.mapped)
+        if (this.mapped && !notification.urgency != MessageTray.Urgency.CRITICAL)
             notification.acknowledged = true;
 
         let children = this._list.get_children();
@@ -1325,7 +1325,8 @@ const NotificationSection = new Lang.Class({
         if (!this.actor.mapped)
             return;
         this._messages.forEach(function(m) {
-            m.notification.acknowledged = true;
+            if (m.notification.urgency != MessageTray.Urgency.CRITICAL)
+                m.notification.acknowledged = true;
         });
     },
 
