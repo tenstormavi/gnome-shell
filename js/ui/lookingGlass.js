@@ -372,7 +372,10 @@ const ObjInspector = new Lang.Class({
         this._parentList = [];
 
         this.actor = new St.ScrollView({ pivot_point: new Clutter.Point({ x: 0.5, y: 0.5 }),
-                                         x_fill: true, y_fill: true });
+                                         x_fill: true, y_fill: true,
+                                         x_expand: true, y_expand: true });
+        this.actor.set_x_align(Clutter.ActorAlign.CENTER);
+        this.actor.set_y_align(Clutter.ActorAlign.START);
         this.actor.get_hscroll_bar().hide();
         this._container = new St.BoxLayout({ name: 'LookingGlassPropertyInspector',
                                              style_class: 'lg-dialog',
@@ -794,7 +797,10 @@ const LookingGlass = new Lang.Class({
                                         style_class: 'lg-dialog',
                                         vertical: true,
                                         visible: false,
-                                        reactive: true });
+                                        reactive: true,
+                                        x_expand: true, y_expand: true,
+                                        x_align: Clutter.ActorAlign.CENTER,
+                                        y_align: Clutter.ActorAlign.START });
         this.actor.connect('key-press-event', Lang.bind(this, this._globalKeyPressEvent));
 
         this._interfaceSettings = new Gio.Settings({ schema_id: 'org.gnome.desktop.interface' });
@@ -802,17 +808,14 @@ const LookingGlass = new Lang.Class({
                                         Lang.bind(this, this._updateFont));
         this._updateFont();
 
-        // We want it to appear to slide out from underneath the panel
-        Main.uiGroup.add_actor(this.actor);
-        Main.uiGroup.set_child_below_sibling(this.actor,
-                                             Main.layoutManager.panelBox);
-        Main.layoutManager.panelBox.connect('allocation-changed',
-                                            Lang.bind(this, this._queueResize));
+        Main.layoutManager.trayBox.add_actor(this.actor);
+        Main.layoutManager.connect('monitors-changed',
+                                   Lang.bind(this, this._queueResize));
         Main.layoutManager.keyboardBox.connect('allocation-changed',
                                                Lang.bind(this, this._queueResize));
 
         this._objInspector = new ObjInspector(this);
-        Main.uiGroup.add_actor(this._objInspector.actor);
+        Main.layoutManager.trayBox.add_actor(this._objInspector.actor);
         this._objInspector.actor.hide();
 
         let toolbar = new St.BoxLayout({ name: 'Toolbar' });
@@ -1031,23 +1034,20 @@ const LookingGlass = new Lang.Class({
 
     _queueResize: function() {
         Meta.later_add(Meta.LaterType.BEFORE_REDRAW,
-                       Lang.bind(this, function () { this._resize(); }));
+                       Lang.bind(this, this._resize));
     },
 
     _resize: function() {
-        let primary = Main.layoutManager.primaryMonitor;
-        let myWidth = primary.width * 0.7;
-        let availableHeight = primary.height - Main.layoutManager.keyboardBox.height;
-        let myHeight = Math.min(primary.height * 0.7, availableHeight * 0.9);
-        this.actor.x = primary.x + (primary.width - myWidth) / 2;
-        this._hiddenY = primary.y + Main.layoutManager.panelBox.height - myHeight;
-        this._targetY = this._hiddenY + myHeight;
-        this.actor.y = this._hiddenY;
-        this.actor.width = myWidth;
-        this.actor.height = myHeight;
-        this._objInspector.actor.set_size(Math.floor(myWidth * 0.8), Math.floor(myHeight * 0.8));
-        this._objInspector.actor.set_position(this.actor.x + Math.floor(myWidth * 0.1),
-                                              this._targetY + Math.floor(myHeight * 0.1));
+        let [areaWidth, areaHeight] = Main.layoutManager.trayBox.allocation.get_size();
+        let myWidth = areaWidth * 0.7;
+        let availableHeight = areaHeight - Main.layoutManager.keyboardBox.height;
+        let myHeight = Math.min(areaHeight * 0.7, availableHeight * 0.9);
+        this.actor.set_size(myWidth, myHeight);
+        this.actor.y = -myHeight;
+        this._objInspector.actor.set_size(Math.floor(myWidth * 0.8),
+                                          Math.floor(myHeight * 0.8));
+        this._objInspector.actor.set_position(Math.floor(myWidth * 0.1),
+                                              Math.floor(myHeight * 0.1));
     },
 
     insertObject: function(obj) {
@@ -1100,7 +1100,7 @@ const LookingGlass = new Lang.Class({
         // through LookingGlass without long waits.
         Tweener.addTween(this.actor, { time: 0.5 / St.get_slow_down_factor(),
                                        transition: 'easeOutQuad',
-                                       y: this._targetY
+                                       y: 0
                                      });
     },
 
@@ -1119,7 +1119,7 @@ const LookingGlass = new Lang.Class({
 
         Tweener.addTween(this.actor, { time: Math.min(0.5 / St.get_slow_down_factor(), 0.5),
                                        transition: 'easeOutQuad',
-                                       y: this._hiddenY,
+                                       y: -this.actor.height,
                                        onComplete: Lang.bind(this, function () {
                                            this.actor.hide();
                                        })
