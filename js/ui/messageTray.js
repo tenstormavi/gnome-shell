@@ -664,9 +664,9 @@ const Notification = new Lang.Class({
         this.bannerBodyMarkup = params.bannerMarkup;
         this._bannerBodyAdded = false;
 
-        // Add the bannerBody now if we know for sure we'll need it
-        if (this.bannerBodyText)
-            this._addBannerBody();
+        if (params.clear)
+            this._bannerBodyBin.destroy_all_children();
+        this._addBannerBody();
 
         if (this._soundName != params.soundName ||
             this._soundFile != params.soundFile) {
