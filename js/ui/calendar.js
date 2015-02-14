@@ -24,6 +24,8 @@ const ELLIPSIS_CHAR = '\u2026';
 
 const MAX_NOTIFICATION_BUTTONS = 3;
 
+const MESSAGE_ANIMATION_TIME = 0.1;
+
 // alias to prevent xgettext from picking up strings translated in GTK+
 const gtk30_ = Gettext_gtk30.gettext;
 const NC_ = function(context, str) { return str; };
@@ -995,7 +997,7 @@ const MessageListSection = new Lang.Class({
             bin.scale_y = bin.scale_x = 0;
             Tweener.addTween(bin, { scale_x: 1,
                                     scale_y: 1,
-                                    time: MessageTray.ANIMATION_TIME,
+                                    time: MESSAGE_ANIMATION_TIME,
                                     transition: 'easeOutQuad' });
         }
 
@@ -1008,7 +1010,7 @@ const MessageListSection = new Lang.Class({
         if (animate)
             Tweener.addTween(bin, { scale_x: 0,
                                     scale_y: 0,
-                                    time: MessageTray.ANIMATION_TIME,
+                                    time: MESSAGE_ANIMATION_TIME,
                                     transition: 'easeOutQuad',
                                     onComplete: function() { bin.destroy(); } });
         else
@@ -1021,10 +1023,11 @@ const MessageListSection = new Lang.Class({
 
     _tweenMessages: function(messages, params, onComplete) {
         if (Array.isArray(messages)) {
+            let delay = params.time / messages.length;
             for (let i = 0; i < messages.length; i++) {
                 if (i == messages.length - 1)
                     params.onComplete = onComplete;
-                params.delay = i * 0.1;
+                params.delay = i * delay;
                 Tweener.addTween(messages[i].actor.get_parent(), params);
             }
         } else {
@@ -1035,13 +1038,17 @@ const MessageListSection = new Lang.Class({
 
     clear: function() {
         let messages = this._messages.filter(function(m) { return m.canClear(); });
-        this._tweenMessages(messages,
-                            { anchor_x: this._list.width,
-                              time: MessageTray.ANIMATION_TIME,
-                              transition: 'easeOutQuad' },
-                            function() {
-                                messages.forEach(function(m) { m.actor.get_parent().destroy(); });
-                            });
+        if (messages.length < 2)
+            messages.forEach(Lang.bind(this, function(m) { this.removeMessage(m, true); }));
+        else
+            this._tweenMessages(messages,
+                                { anchor_x: this._list.width,
+                                  opacity: 0,
+                                  time: MESSAGE_ANIMATION_TIME,
+                                  transition: 'easeOutQuad' },
+                                Lang.bind(this, function() {
+                                    messages.forEach(Lang.bind(this, this.removeMessage, true));
+                                }));
     },
 
     _canClear: function() {
