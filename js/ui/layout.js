@@ -291,6 +291,9 @@ const LayoutManager = new Lang.Class({
 
         let trayConstraint = new MonitorConstraint({ primary: true });
         this.trayBox.add_constraint(trayConstraint);
+        this.panelBox.bind_property('visible', trayConstraint, 'work-area',
+                                    GObject.BindingFlags.SYNC_CREATE);
+
 
         this._loadBackground();
     },
