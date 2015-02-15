@@ -3,6 +3,7 @@
 const Clutter = imports.gi.Clutter;
 const GLib = imports.gi.GLib;
 const Gio = imports.gi.Gio;
+const GObject = imports.gi.GObject;
 const Gtk = imports.gi.Gtk;
 const Atk = imports.gi.Atk;
 const Lang = imports.lang;
@@ -414,20 +415,29 @@ const NotificationApplicationPolicy = new Lang.Class({
 const LabelExpanderLayout = new Lang.Class({
     Name: 'LabelExpanderLayout',
     Extends: Clutter.BinLayout,
+    Properties: { 'expansion': GObject.ParamSpec.double('expansion',
+                                                        'Expansion',
+                                                        'Expansion of the layout, between 0 (collapsed) ' +
+                                                        'and 1 (fully expanded',
+                                                         GObject.ParamFlags.READABLE | GObject.ParamFlags.WRITABLE,
+                                                         0, 1, 0)},
 
     _init: function(params) {
-        this._expandY = 0;
+        this._expansion = 0;
         this.expandLines = 6;
 
         this.parent(params);
     },
 
-    get expandY() {
-        return this._expandY;
+    get expansion() {
+        return this._expansion;
     },
 
-    set expandY(v) {
-        this._expandY = v;
+    set expansion(v) {
+        if (v == this._expansion)
+            return;
+        this._expansion = v;
+        this.notify('expansion');
         this.layout_changed();
     },
 
@@ -440,8 +450,8 @@ const LabelExpanderLayout = new Lang.Class({
         let [min, nat] = child.get_preferred_height(forWidth);
         let [expandedMin, expandedNat] = [Math.min(min, lineMin * this.expandLines),
                                           Math.min(nat, lineNat * this.expandLines)];
-        return [lineMin + this._expandY * (expandedMin - lineMin),
-                lineNat + this._expandY * (expandedNat - lineNat)];
+        return [lineMin + this._expansion * (expandedMin - lineMin),
+                lineNat + this._expansion * (expandedNat - lineNat)];
     }
 });
 
@@ -881,11 +891,11 @@ const Notification = new Lang.Class({
 
         if (animate)
             Tweener.addTween(this._bannerBodyBin.layout_manager,
-                             { expandY: 1,
+                             { expansion: 1,
                                time: ANIMATION_TIME,
                                transition: 'easeOutBack' });
         else
-            this._bannerBodyBin.layout_manager.expandY = 1;
+            this._bannerBodyBin.layout_manager.expansion = 1;
 
         this.emit('expanded');
     },
@@ -900,7 +910,7 @@ const Notification = new Lang.Class({
             this._actionArea.hide();
         if (this._bannerBodyBin)
             Tweener.addTween(this._bannerBodyBin.layout_manager,
-                             { expandY: 0, time: 0.2 });
+                             { expansion: 0, time: 0.2 });
 
         // Make sure we don't line wrap the title, and ellipsize it instead.
         this._titleLabel.clutter_text.line_wrap = false;
