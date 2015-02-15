@@ -150,7 +150,7 @@ const WorldClocksSection = new Lang.Class({
 
         let layout = this._grid.layout_manager;
         let title = (this._locations.length == 0) ? _("Add world clocks...")
-                                                  : _("World clocks");
+                                                  : _("World Clocks");
         let header = new St.Label({ style_class: 'world-clocks-header',
                                     text: title });
         layout.attach(header, 0, 0, 2, 1);
