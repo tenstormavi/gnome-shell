@@ -345,15 +345,15 @@ const DateMenuButton = new Lang.Class({
         hbox.add(vbox);
 
         this._date = new TodayButton(this._calendar);
-        vbox.add(this._date.actor, { x_fill: true  });
+        vbox.add_actor(this._date.actor);
 
-        vbox.add(this._calendar.actor);
+        vbox.add_actor(this._calendar.actor);
 
         let scroll = new St.ScrollView({ style_class: 'vfade',
                                          x_expand: true, x_fill: true,
                                          overlay_scrollbars: true });
         scroll.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC);
-        vbox.add(scroll);
+        vbox.add_actor(scroll);
 
         let displaysBox = new St.BoxLayout({ vertical: true,
                                              style_class: 'datemenu-displays-box' });
