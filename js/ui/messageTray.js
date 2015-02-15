@@ -414,7 +414,7 @@ const NotificationApplicationPolicy = new Lang.Class({
 
 const LabelExpanderLayout = new Lang.Class({
     Name: 'LabelExpanderLayout',
-    Extends: Clutter.BinLayout,
+    Extends: Clutter.LayoutManager,
     Properties: { 'expansion': GObject.ParamSpec.double('expansion',
                                                         'Expansion',
                                                         'Expansion of the layout, between 0 (collapsed) ' +
@@ -438,21 +438,78 @@ const LabelExpanderLayout = new Lang.Class({
             return;
         this._expansion = v;
         this.notify('expansion');
+
+        let visibleIndex = this._expansion > 0 ? 1 : 0;
+        for (let i = 0; this._container && i < this._container.get_n_children(); i++)
+            this._container.get_child_at_index(i).visible = (i == visibleIndex);
+
         this.layout_changed();
     },
 
+    vfunc_set_container: function(container) {
+        this._container = container;
+    },
+
+    vfunc_get_preferred_width: function(container, forHeight) {
+        let [min, nat] = [0, 0];
+
+        for (let i = 0; i < container.get_n_children(); i++) {
+            if (i > 1)
+                break; // we support one unexpanded + one expanded child
+
+            let child = container.get_child_at_index(i);
+            let [childMin, childNat] = child.get_preferred_width(forHeight);
+            [min, nat] = [Math.max(min, childMin), Math.max(nat, childNat)];
+        }
+
+        return [min, nat];
+    },
+
     vfunc_get_preferred_height: function(container, forWidth) {
-        if (container.get_n_children() < 2)
-            return this.parent(container, forWidth);
+        let [min, nat] = [0, 0];
 
         let children = container.get_children();
+        if (children[0])
+            [min, nat] = children[0].get_preferred_height(forWidth);
 
-        let [lineMin, lineNat] = children[0].get_preferred_height(forWidth);
-        let [min, nat] = children[1].get_preferred_height(forWidth);
-        let [expandedMin, expandedNat] = [Math.min(min, lineMin * this.expandLines),
-                                          Math.min(nat, lineNat * this.expandLines)];
-        return [lineMin + this._expansion * (expandedMin - lineMin),
-                lineNat + this._expansion * (expandedNat - lineNat)];
+        if (children[1]) {
+            let [min2, nat2] = children[1].get_preferred_height(forWidth);
+            let [expMin, expNat] = [Math.min(min2, min * this.expandLines),
+                                    Math.min(nat2, nat * this.expandLines)];
+            [min, nat] = [min + this._expansion * (expMin - min),
+                          nat + this._expansion * (expNat - nat)];
+        }
+
+        return [min, nat];
+    },
+
+    vfunc_allocate: function(container, box, flags) {
+        for (let i = 0; i < container.get_n_children(); i++) {
+            let child = container.get_child_at_index(i);
+
+            if (!child.visible)
+                continue;
+
+            let xAlign = 0;
+            let xFill = false;
+            if (child.needs_expand(Clutter.Orientation.HORIZONTAL)) {
+                switch(child.get_x_align()) {
+                    case Clutter.ActorAlign.FILL:
+                        xFill = true;
+                        break;
+                    case Clutter.ActorAlign.START:
+                        break;
+                    case Clutter.ActorAlign.CENTER:
+                        xAlign = 0.5;
+                        break;
+                    case Clutter.ActorAlign.END:
+                        xAlign = 1;
+                        break;
+                }
+            }
+            child.allocate_align_fill(box, xAlign, 0, xFill, false, flags);
+        }
+
     }
 });
 
@@ -741,7 +798,6 @@ const Notification = new Lang.Class({
             label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
             label.actor.x_expand = true;
             label.actor.x_align = Clutter.ActorAlign.START;
-            label.actor.opacity = 0;
             this._bannerBodyBin.add_actor(label.actor);
         }
     },
@@ -894,18 +950,6 @@ const Notification = new Lang.Class({
         this._closeButton.visible = hovered;
     },
 
-    _onExpansionUpdate: function() {
-        let bin = this._bannerBodyBin;
-        let expansion = Math.min(Math.max(0, bin.layout_manager.expansion), 1);
-        for (let i = 0; i < bin.get_n_children(); i++) {
-            let child = bin.get_child_at_index(i);
-            if (i == 0)
-                child.opacity = (1 - expansion) * 255;
-            else
-                child.opacity = expansion * 255;
-        }
-    },
-
     expand: function(animate) {
         this.expanded = true;
 
@@ -917,10 +961,7 @@ const Notification = new Lang.Class({
             Tweener.addTween(this._bannerBodyBin.layout_manager,
                              { expansion: 1,
                                time: ANIMATION_TIME,
-                               transition: 'easeOutBack',
-                               onUpdate: Lang.bind(this,
-                                                   this._onExpansionUpdate)
-                             });
+                               transition: 'easeOutBack' });
         else
             this._bannerBodyBin.layout_manager.expansion = 1;
 
