@@ -442,12 +442,13 @@ const LabelExpanderLayout = new Lang.Class({
     },
 
     vfunc_get_preferred_height: function(container, forWidth) {
-        let child = container.get_first_child();
-        if (!child)
+        if (container.get_n_children() < 2)
             return this.parent(container, forWidth);
 
-        let [lineMin, lineNat] = child.get_preferred_height(-1);
-        let [min, nat] = child.get_preferred_height(forWidth);
+        let children = container.get_children();
+
+        let [lineMin, lineNat] = children[0].get_preferred_height(forWidth);
+        let [min, nat] = children[1].get_preferred_height(forWidth);
         let [expandedMin, expandedNat] = [Math.min(min, lineMin * this.expandLines),
                                           Math.min(nat, lineNat * this.expandLines)];
         return [lineMin + this._expansion * (expandedMin - lineMin),
@@ -727,9 +728,20 @@ const Notification = new Lang.Class({
         if (this.bannerBodyText && !this._bannerBodyAdded) {
             this._bannerBodyAdded = true;
 
+            let layout = this._bannerBodyBin.layout_manager;
+
             let label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
             label.actor.x_expand = true;
+            label.actor.y_expand = true;
             label.actor.x_align = Clutter.ActorAlign.START;
+            label.actor.y_align = Clutter.ActorAlign.START;
+            label.actor.clutter_text.single_line_mode = true;
+            this._bannerBodyBin.add_actor(label.actor);
+
+            label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
+            label.actor.x_expand = true;
+            label.actor.x_align = Clutter.ActorAlign.START;
+            label.actor.opacity = 0;
             this._bannerBodyBin.add_actor(label.actor);
         }
     },
@@ -882,6 +894,18 @@ const Notification = new Lang.Class({
         this._closeButton.visible = hovered;
     },
 
+    _onExpansionUpdate: function() {
+        let bin = this._bannerBodyBin;
+        let expansion = Math.min(Math.max(0, bin.layout_manager.expansion), 1);
+        for (let i = 0; i < bin.get_n_children(); i++) {
+            let child = bin.get_child_at_index(i);
+            if (i == 0)
+                child.opacity = (1 - expansion) * 255;
+            else
+                child.opacity = expansion * 255;
+        }
+    },
+
     expand: function(animate) {
         this.expanded = true;
 
@@ -893,7 +917,10 @@ const Notification = new Lang.Class({
             Tweener.addTween(this._bannerBodyBin.layout_manager,
                              { expansion: 1,
                                time: ANIMATION_TIME,
-                               transition: 'easeOutBack' });
+                               transition: 'easeOutBack',
+                               onUpdate: Lang.bind(this,
+                                                   this._onExpansionUpdate)
+                             });
         else
             this._bannerBodyBin.layout_manager.expansion = 1;
 
