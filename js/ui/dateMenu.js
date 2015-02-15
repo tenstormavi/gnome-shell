@@ -36,6 +36,7 @@ const TodayButton = new Lang.Class({
         // on the current date can be confusing. So don't make the button reactive
         // until the selected date changes.
         this.actor = new St.Button({ style_class: 'datemenu-today-button',
+                                     x_align: St.Align.START,
                                      reactive: false
                                    });
         this.actor.connect('clicked', Lang.bind(this,
