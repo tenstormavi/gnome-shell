@@ -1321,6 +1321,14 @@ StScrollBar StButton#vhandle:active {
     padding: .4em;
 }
 
+.message-list-section-list:ltr {
+    padding-left: .4em;
+}
+
+.message-list-section-list:rtl {
+    padding-right: .4em;
+}
+
 .message-list-section-title:hover,
 .datemenu-today-button:hover,
 .world-clocks-button:hover {
