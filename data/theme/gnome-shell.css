@@ -1544,7 +1544,7 @@ StScrollBar StButton#vhandle:active {
 /* Message list */
 
 .message-list {
-    width: 320px;
+    width: 340px;
 }
 
 .message-list-sections {
