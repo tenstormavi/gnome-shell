@@ -582,10 +582,6 @@ const FdoNotificationDaemonSource = new Lang.Class({
         this.destroyNonResidentNotifications();
     },
 
-    _lastNotificationRemoved: function() {
-        this.destroy();
-    },
-
     openApp: function() {
         if (this.app == null)
             return;
