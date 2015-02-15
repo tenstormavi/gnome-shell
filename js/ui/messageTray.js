@@ -1136,7 +1136,7 @@ const Source = new Lang.Class({
 
         this.notifications.splice(index, 1);
         if (this.notifications.length == 0)
-            this._lastNotificationRemoved();
+            this.destroy();
 
         this.countUpdated();
     },
@@ -1198,11 +1198,6 @@ const Source = new Lang.Class({
                 this.notifications[i].destroy();
 
         this.countUpdated();
-    },
-
-    // Default implementation is to destroy this source, but subclasses can override
-    _lastNotificationRemoved: function() {
-        this.destroy();
     }
 });
 Signals.addSignalMethods(Source.prototype);
