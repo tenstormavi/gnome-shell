@@ -1282,11 +1282,8 @@ const NotificationMessage = new Lang.Class({
     Extends: Message,
 
     _init: function(notification) {
-        let body = '';
-        if (notification.bannerBodyText)
-            body = notification.bannerBodyMarkup ? notification.bannerBodyText
-                                                 : GLib.markup_escape_text(notification.bannerBodyText, -1);
-        this.parent(notification.title, body);
+        this.setUseBodyMarkup(notification.bannerBodyMarkup);
+        this.parent(notification.title, notification.bannerBodyText);
 
         let gicon = null;
         if (notification._iconBin.child)
