@@ -877,19 +877,13 @@ Signals.addSignalMethods(Notification.prototype);
 const Message = new Lang.Class({
     Name: 'Message',
 
-    _init: function(title, body, params) {
-        params = Params.parse(params, { gicon: null,
-                                        time: null });
-
+    _init: function(title, body) {
         this.actor = new St.Button({ style_class: 'message',
                                      accessible_role: Atk.Role.NOTIFICATION,
                                      x_expand: true, x_fill: true });
 
-        this._vbox = new St.BoxLayout({ vertical: true });
-        this.actor.set_child(this._vbox);
-
-        hbox = new St.BoxLayout();
-        this._vbox.add_actor(hbox);
+        let hbox = new St.BoxLayout();
+        this.actor.set_child(hbox);
 
         this._iconBin = new St.Bin({ style_class: 'message-icon-bin',
                                      y_expand: true,
@@ -904,9 +898,10 @@ const Message = new Lang.Class({
         let titleBox = new St.BoxLayout();
         contentBox.add_actor(titleBox);
 
-        this._titleLabel = new St.Label({ text: title, x_expand: true,
-                                          x_align: Clutter.ActorAlign.START });
-        titleBox.add_actor(this._titleLabel);
+        this.titleLabel = new St.Label({ style_class: 'message-title',
+                                         text: title, x_expand: true,
+                                         x_align: Clutter.ActorAlign.START });
+        titleBox.add_actor(this.titleLabel);
 
         this._secondaryBin = new St.Bin({ style_class: 'message-secondary-bin' });
         titleBox.add_actor(this._secondaryBin);
@@ -916,11 +911,9 @@ const Message = new Lang.Class({
         this._closeButton = new St.Button({ child: closeIcon, visible: false });
         titleBox.add_actor(this._closeButton);
 
-        this._body = new St.Label({ style_class: 'message-body', text: body,
-                                    x_expand: true });
-        this._body.clutter_text.line_wrap = false;
-        this._body.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        contentBox.add_actor(this._body);
+        this.bodyLabel = new St.Label({ style_class: 'message-body', text: body,
+                                        x_expand: true });
+        contentBox.add_actor(this.bodyLabel);
 
         this._closeButton.connect('clicked', Lang.bind(this,
             function() {
@@ -1003,6 +996,10 @@ const MessageListSection = new Lang.Class({
     },
 
     addMessage: function(message, animate) {
+        this.addMessageAtIndex(message, 0, animate);
+    },
+
+    addMessageAtIndex: function(message, index, animate) {
         let bin = new St.Widget({ layout_manager: new ScaleLayout(),
                                   pivot_point: new Clutter.Point({ x: 0.5, y: 0.5 }) });
         bin._delegate = message;
@@ -1010,7 +1007,7 @@ const MessageListSection = new Lang.Class({
         message.connect('close', Lang.bind(this, this.removeMessage, true));
 
         bin.add_actor(message.actor);
-        this._list.add_actor(bin);
+        this._list.insert_child_at_index(bin, index);
 
         if (animate) {
             bin.scale_y = bin.scale_x = 0;
@@ -1019,8 +1016,6 @@ const MessageListSection = new Lang.Class({
                                     time: MESSAGE_ANIMATION_TIME,
                                     transition: 'easeOutQuad' });
         }
-
-        return bin;
     },
 
     removeMessage: function(message, animate) {
@@ -1131,28 +1126,33 @@ const ScaleLayout = new Lang.Class({
     }
 });
 
-const NotificationListEntry = new Lang.Class({
-    Name: 'NotificationListEntry',
+const NotificationMessage = new Lang.Class({
+    Name: 'NotificationMessage',
     Extends: Message,
 
     _init: function(notification) {
-        let params = { gicon: notification.icon || notification.source.getIcon() };
-        if (!this._noDate)
-            params.time = new Date();
+        let body = '';
+        if (notification.bannerBodyText)
+            body = notification.bannerBodyMarkup ? notification.bannerBodyText
+                                                 : GLib.markup_escape_text(notification.bannerBodyText, -1);
+        this.parent(notification.title, body);
 
-        this.parent(notification.title, notification.body, params);
+        let gicon = null;
+        if (notification._iconBin.child)
+            gicon = notification._iconBin.child.gicon;
+        let icon;
+        if (gicon)
+            icon = new St.Icon({ gicon: gicon, icon_size: 48 });
+        else
+            icon = source.createIcon(48);
+
+        this.setIcon(icon);
 
         this.notification = notification;
 
         this.actor.connect('clicked', Lang.bind(this,
             function() {
-                if (this.notification.defaultAction)
-                    this.notification.defaultAction();
-                else
-                    this.notification.source.open();
-
-                if (!this.notification.resident)
-                    this.actor.destroy();
+                notification._onClicked();
             }));
         this.connect('close', Lang.bind(this,
             function() {
@@ -1160,14 +1160,18 @@ const NotificationListEntry = new Lang.Class({
             }));
         this.notification.connect('destroy', Lang.bind(this,
             function() {
-                this.actor.destroy();
+                this.emit('close');
             }));
+    },
+
+    canClear: function() {
+        return !this.notification.resident;
     }
 });
 
 const NotificationBanner = new Lang.Class({
     Name: 'NotificationBanner',
-    Extends: NotificationListEntry,
+    Extends: NotificationMessage,
 
     _init: function(notification) {
         this._noDate = true;
@@ -1181,7 +1185,7 @@ const NotificationBanner = new Lang.Class({
         this.actor.set_y_align(Clutter.ActorAlign.START);
 
         this._expanded = false;
-        this._body.clutter_text.line_wrap = true;
+        this.bodyLabel.clutter_text.line_wrap = true;
 
         this._actionBin = new St.Widget({ layout_manager: new ScaleLayout(),
                                           visible: false });
@@ -1228,14 +1232,14 @@ const NotificationBanner = new Lang.Class({
 
         this._expanded = v;
 
-        let forWidth = this._body.clutter_text.width;
+        let forWidth = this.bodyLabel.clutter_text.width;
         let [, lineHeight] = 
-            this._body.clutter_text.get_preferred_height (-1);
+            this.bodyLabel.clutter_text.get_preferred_height (-1);
 
         let height, scale;
         if (this._expanded) {
             let [, natHeight] =
-                this._body.clutter_text.get_preferred_height (forWidth);
+                this.bodyLabel.clutter_text.get_preferred_height (forWidth);
             height = Math.min(6 * lineHeight, natHeight);
 
             this._actionBin.scale_y = 0;
@@ -1247,7 +1251,7 @@ const NotificationBanner = new Lang.Class({
         }
 
         this._actionBin.show();
-        Tweener.addTween(this._body, { height: height, time: 0.2, transition: 'easeOutQuad' });
+        Tweener.addTween(this.bodyLabel, { height: height, time: 0.2, transition: 'easeOutQuad' });
         Tweener.addTween(this._actionBin, { scale_y: scale, time: 0.2, transition: 'easeOutQuad',
                                             onComplete: Lang.bind(this, function() { if (!this._expanded) this._actionBin.hide(); }) });
     }
@@ -1267,13 +1271,6 @@ const NotificationSection = new Lang.Class({
         Main.messageTray.getSources().forEach(Lang.bind(this, function(source) {
             this._sourceAdded(Main.messageTray, source);
         }));
-
-        this._bannerBox = new St.Widget({ layout_manager: new Clutter.BinLayout(),
-                                          clip_to_allocation: true });
-        this._bannerBox.add_constraint(new Layout.MonitorConstraint({ primary: true, work_area: true }));
-        Main.layoutManager.addChrome(this._bannerBox, { affectsInputRegion: false });
-
-        global.screen.connect('in-fullscreen-changed', Lang.bind(this, this._checkQueue));
 
         this.actor.connect('notify::mapped', Lang.bind(this, this._onMapped));
 
@@ -1297,35 +1294,13 @@ const NotificationSection = new Lang.Class({
     },
 
     _onNotificationAdded: function(source, notification) {
-        //let gicon = notification._icon ? notification._icon.gicon : source.getIcon();
-        let gicon = null;
-        if (notification._iconBin.child)
-            gicon = notification._iconBin.child.gicon;
-        let icon;
-        if (gicon)
-            icon = new St.Icon({ gicon: gicon,
-                                 icon_size: 48 });
-        else
-            icon = source.createIcon(48);
+        let message = new NotificationMessage(notification);
 
-        let body = '';
-        if (notification.bannerBodyText) {
-            body = notification.bannerBodyMarkup ? notification.bannerBodyText
-                                                 : GLib.markup_escape_text(notification.bannerBodyText, -1);
-        }
-        let listEntry = new Message(notification.title, body);
         let time = new Date().toLocaleFormat(C_("event list time", "%H\u2236%M"));
-        listEntry.setSecondaryActor(new St.Label({ style_class: 'event-time',
+        message.setSecondaryActor(new St.Label({ style_class: 'event-time',
                                                    x_align: Clutter.ActorAlign.END,
                                                    text: time }));
-        listEntry.setIcon(icon);
 
-        listEntry.actor.connect('clicked', function() { notification._onClicked(); });
-        notification.connect('destroy', Lang.bind(this, function() {
-            this.removeMessage(listEntry, this.actor.mapped);
-        }));
-        listEntry.connect('close', function() { notification.destroy(); });
-        listEntry.notification = notification;
         if (this.mapped && !notification.urgency != MessageTray.Urgency.CRITICAL)
             notification.acknowledged = true;
 
@@ -1335,8 +1310,7 @@ const NotificationSection = new Lang.Class({
             if (children[index]._delegate.notification.urgency <= notification.urgency)
                 break;
 
-        let listChild = this.addMessage(listEntry, this.actor.mapped);
-        this._list.set_child_at_index(listChild, index);
+        this.addMessageAtIndex(message, index, this.actor.mapped);
     },
 
     _onSourceDestroy: function(source, obj) {
@@ -1355,80 +1329,6 @@ const NotificationSection = new Lang.Class({
         });
     },
 
-    addNotification: function(notification) {
-        let listEntry = new NotificationListEntry(notification);
-        // TODO: Keep URGENT notifications on top
-        this._list.insert_child_below(listEntry.actor, null);
-
-        // TODO: Implement notification queue
-        if (!notification.source.policy.showBanners)
-            return;
-
-        if (this._notificationQueue.indexOf(notification) < 0) {
-        /*
-            notification.connect('destroy',
-                                 Lang.bind(this, this._onNotificationDestroy));
-                                 */
-            this._notificationQueue.push(notification);
-            this._notificationQueue.sort(function(notification1, notification2) {
-                return (notification2.priority - notification1.priority);
-            });
-
-            this._checkQueue();
-        }
-    },
-
-    _checkQueue: function() {
-        if (this._banner)
-            return;
-
-        if (!Main.sessionMode.hasNotifications)
-            return;
-
-        // Filter out acknowledged notifications.
-        this._notificationQueue = this._notificationQueue.filter(function(n) {
-            return !n.acknowledged;
-        });
-
-        if (this._notificationQueue.length == 0)
-            return;
-
-        let notification = this._notificationQueue[0] || null;
-        let limited = this._busy || Main.layoutManager.primaryMonitor.inFullscreen;
-        if (!limited || notification.forFeedback || notification.priority == Gio.NotificationPriority.URGENT)
-            this._showBanner();
-    },
-
-    showTestBanner: function() {
-        let notification = new Notification(new Source('Test', 'dialog-info-symbolic'),
-                                            "Test notification",
-                                            "This is a small test notification with a lengthy body to test expanding of banners; something's wrong in the tray but seems to work here, no idea what's going on ...");
-        this.addNotification(notification);
-    },
-
-    _showBanner: function() {
-        let notification = this._notificationQueue.shift();
-
-        this._banner = new NotificationBanner(notification);
-        this._banner.actor.connect('destroy', Lang.bind(this,
-            function() {
-                this._banner = null;
-                this._checkQueue();
-            }));
-        this._bannerBox.add_actor(this._banner.actor);
-        Main.layoutManager.trackChrome(this._banner.actor, { affectsInputRegion: true });
-
-        this._banner.actor.anchor_y = this._banner.actor.height;
-        this._banner.actor.opacity = 0;
-        Tweener.addTween(this._banner.actor, { anchor_y: 0, opacity: 255, time: 0.2, transition: 'easeOutBack' });
-        Mainloop.timeout_add(2000, Lang.bind(this, this._hideBanner));
-    },
-
-    _hideBanner: function() {
-        Tweener.addTween(this._banner.actor, { anchor_y: this._banner.actor.height, opacity: 0, time: 0.2, transition: 'easeInBack',
-                                               onComplete: Lang.bind(this, function() { this._banner.actor.destroy(); }) });
-    },
-
     _onTitleClicked: function() {
         this.parent();
 
@@ -1444,7 +1344,6 @@ const NotificationSection = new Lang.Class({
 
     _sessionUpdated: function() {
         this._title.reactive = Main.sessionMode.allowSettings;
-        this._checkQueue();
     }
 });
 
@@ -1518,8 +1417,7 @@ const EventsSection = new Lang.Class({
                 else
                     title = title + ELLIPSIS_CHAR;
             }
-            let eventEntry = new Message(title, event.summary);
-            this.addMessage(eventEntry, false);
+            this.addMessage(new Message(title, event.summary), false);
         }
 
         this._reloading = false;
