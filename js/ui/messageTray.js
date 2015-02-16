@@ -620,7 +620,8 @@ const Notification = new Lang.Class({
         let titleBox = new St.BoxLayout();
         this._contentBox.add_actor(titleBox);
 
-        this._titleLabel = new St.Label({ x_expand: true });
+        this._titleLabel = new St.Label({ x_expand: true,
+                                          x_align: Clutter.ActorAlign.START });
         titleBox.add_actor(this._titleLabel);
 
         this._secondaryIcon = new St.Icon({ style_class: 'notification-secondary-icon',
@@ -633,7 +634,8 @@ const Notification = new Lang.Class({
                                             visible: this.expanded });
         titleBox.add_actor(this._closeButton);
 
-        this._bannerBodyBin = new St.Widget();
+        this._bannerBodyBin = new St.Widget({ x_expand: true,
+                                              x_align: Clutter.ActorAlign.START });
         this._bannerBodyBin.layout_manager = new LabelExpanderLayout();
         this._contentBox.add_actor(this._bannerBodyBin);
 
@@ -789,9 +791,7 @@ const Notification = new Lang.Class({
 
             let label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
             label.actor.x_expand = true;
-            label.actor.y_expand = true;
             label.actor.x_align = Clutter.ActorAlign.START;
-            label.actor.y_align = Clutter.ActorAlign.START;
             label.actor.clutter_text.single_line_mode = true;
             this._bannerBodyBin.add_actor(label.actor);
 
