@@ -1584,12 +1584,17 @@ StScrollBar StButton#vhandle:active {
     background-color: #2c2c2c;
 }
 
-.message:hover {
+.message:hover,
+.message:focus {
     background-color: #4c4c4c;
 }
 
 .message-icon-bin {
     padding: 5px;
+}
+
+.message-title {
+    font-weight: bold;
 }
 
 .message-content {
