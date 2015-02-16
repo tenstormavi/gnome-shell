@@ -1,5 +1,6 @@
 // -*- mode: js; js-indent-level: 4; indent-tabs-mode: nil -*-
 
+const Atk = imports.gi.Atk;
 const Clutter = imports.gi.Clutter;
 const Gio = imports.gi.Gio;
 const GLib = imports.gi.GLib;
@@ -873,56 +874,70 @@ const Notification = new Lang.Class({
 });
 Signals.addSignalMethods(Notification.prototype);
 
-const MessageListEntry = new Lang.Class({
-    Name: 'MessageListEntry',
+const Message = new Lang.Class({
+    Name: 'Message',
 
     _init: function(title, body, params) {
         params = Params.parse(params, { gicon: null,
                                         time: null });
 
-        let layout = new Clutter.GridLayout({ orientation: Clutter.Orientation.VERTICAL });
-        this._grid = new St.Widget({ style_class: 'event-grid',
-                                     layout_manager: layout });
-        this.actor = new St.Button({ child: this._grid,
-                                     style_class: 'event-button',
-                                     x_expand: true, x_fill: true,
-                                     can_focus: true });
-        layout.hookup_style(this.actor.child);
+        this.actor = new St.Button({ style_class: 'message',
+                                     accessible_role: Atk.Role.NOTIFICATION,
+                                     x_expand: true, x_fill: true });
 
-        this._icon = new St.Icon({ gicon: params.gicon,
-                                   y_align: Clutter.ActorAlign.START });
-        layout.attach(this._icon, 0, 0, 1, 2);
+        this._vbox = new St.BoxLayout({ vertical: true });
+        this.actor.set_child(this._vbox);
 
-        this._title = new St.Label({ style_class: 'event-title',
-                                     text: title,
-                                     x_expand: true });
-        this._title.clutter_text.line_wrap = false;
-        this._title.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        layout.attach(this._title, 1, 0, 1, 1);
+        hbox = new St.BoxLayout();
+        this._vbox.add_actor(hbox);
 
-        this._time = new St.Label({ style_class: 'event-time',
-                                    x_align: Clutter.ActorAlign.END });
-        if (params.time)
-            this._time.text = params.time.toLocaleFormat(C_("event list time", "%H\u2236%M"));
-        layout.attach(this._time, 2, 0, 1, 1);
+        this._iconBin = new St.Bin({ style_class: 'message-icon-bin',
+                                     y_expand: true,
+                                     visible: false });
+        this._iconBin.set_y_align(Clutter.ActorAlign.START);
+        hbox.add_actor(this._iconBin);
+
+        let contentBox = new St.BoxLayout({ style_class: 'message-content',
+                                            vertical: true, x_expand: true });
+        hbox.add_actor(contentBox);
+
+        let titleBox = new St.BoxLayout();
+        contentBox.add_actor(titleBox);
+
+        this._titleLabel = new St.Label({ text: title, x_expand: true,
+                                          x_align: Clutter.ActorAlign.START });
+        titleBox.add_actor(this._titleLabel);
+
+        this._secondaryBin = new St.Bin({ style_class: 'message-secondary-bin' });
+        titleBox.add_actor(this._secondaryBin);
 
         let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
                                       icon_size: 16 });
-        this._closeButton = new St.Button({ child: closeIcon });
-        layout.attach(this._closeButton, 3, 0, 1, 1);
+        this._closeButton = new St.Button({ child: closeIcon, visible: false });
+        titleBox.add_actor(this._closeButton);
 
-        this._body = new St.Label({ style_class: 'event-body', text: body,
+        this._body = new St.Label({ style_class: 'message-body', text: body,
                                     x_expand: true });
         this._body.clutter_text.line_wrap = false;
         this._body.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-        layout.attach(this._body, 1, 1, 3, 1);
+        contentBox.add_actor(this._body);
 
         this._closeButton.connect('clicked', Lang.bind(this,
             function() {
                 this.emit('close');
             }));
         this.actor.connect('notify::hover', Lang.bind(this, this._sync));
+        this.actor.connect('clicked', Lang.bind(this, this._onClicked));
         this._sync();
+    },
+
+    setIcon: function(actor) {
+        this._iconBin.child = actor;
+        this._iconBin.visible = (actor != null);
+    },
+
+    setSecondaryActor: function(actor) {
+        this._secondaryBin.child = actor;
     },
 
     canClear: function() {
@@ -932,10 +947,13 @@ const MessageListEntry = new Lang.Class({
     _sync: function() {
         let hovered = this.actor.hover;
         this._closeButton.visible = hovered;
-        this._time.visible = !hovered;
+        this._secondaryBin.visible = !hovered;
+    },
+
+    _onClicked: function() {
     }
 });
-Signals.addSignalMethods(MessageListEntry.prototype);
+Signals.addSignalMethods(Message.prototype);
 
 const MessageListSection = new Lang.Class({
     Name: 'MessageListSection',
@@ -1115,7 +1133,7 @@ const ScaleLayout = new Lang.Class({
 
 const NotificationListEntry = new Lang.Class({
     Name: 'NotificationListEntry',
-    Extends: MessageListEntry,
+    Extends: Message,
 
     _init: function(notification) {
         let params = { gicon: notification.icon || notification.source.getIcon() };
@@ -1283,19 +1301,25 @@ const NotificationSection = new Lang.Class({
         let gicon = null;
         if (notification._iconBin.child)
             gicon = notification._iconBin.child.gicon;
-
-        if (!gicon)
-            try {
-                gicon = source.getIcon();
-            } catch(e) {
-            }
+        let icon;
+        if (gicon)
+            icon = new St.Icon({ gicon: gicon,
+                                 icon_size: 48 });
+        else
+            icon = source.createIcon(48);
 
         let body = '';
         if (notification.bannerBodyText) {
             body = notification.bannerBodyMarkup ? notification.bannerBodyText
                                                  : GLib.markup_escape_text(notification.bannerBodyText, -1);
         }
-        let listEntry = new MessageListEntry(notification.title, body, { gicon: gicon, time: new Date() });
+        let listEntry = new Message(notification.title, body);
+        let time = new Date().toLocaleFormat(C_("event list time", "%H\u2236%M"));
+        listEntry.setSecondaryActor(new St.Label({ style_class: 'event-time',
+                                                   x_align: Clutter.ActorAlign.END,
+                                                   text: time }));
+        listEntry.setIcon(icon);
+
         listEntry.actor.connect('clicked', function() { notification._onClicked(); });
         notification.connect('destroy', Lang.bind(this, function() {
             this.removeMessage(listEntry, this.actor.mapped);
@@ -1494,7 +1518,7 @@ const EventsSection = new Lang.Class({
                 else
                     title = title + ELLIPSIS_CHAR;
             }
-            let eventEntry = new MessageListEntry(title, event.summary);
+            let eventEntry = new Message(title, event.summary);
             this.addMessage(eventEntry, false);
         }
 
