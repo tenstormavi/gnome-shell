@@ -1580,6 +1580,22 @@ StScrollBar StButton#vhandle:active {
     background-color: #4c4c4c;
 }
 
+.message {
+    background-color: #2c2c2c;
+}
+
+.message:hover {
+    background-color: #4c4c4c;
+}
+
+.message-icon-bin {
+    padding: 5px;
+}
+
+.message-content {
+    padding: 5px;
+    spacing: 5px;
+}
 
 /* Message Tray */
 
