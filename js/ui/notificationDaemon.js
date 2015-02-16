@@ -474,20 +474,6 @@ const FdoNotificationDaemon = new Lang.Class({
     _emitActionInvoked: function(id, action) {
         this._dbusImpl.emit_signal('ActionInvoked',
                                    GLib.Variant.new('(us)', [id, action]));
-    },
-
-    _onTrayIconAdded: function(o, icon) {
-        let wmClass = icon.wm_class ? icon.wm_class.toLowerCase() : '';
-        if (STANDARD_TRAY_ICON_IMPLEMENTATIONS[wmClass] !== undefined)
-            return;
-
-        let source = this._getSource(icon.title || icon.wm_class || C_("program", "Unknown"), icon.pid, null, null, icon);
-    },
-
-    _onTrayIconRemoved: function(o, icon) {
-        let source = this._lookupSource(null, icon.pid, true);
-        if (source)
-            source.destroy();
     }
 });
 
