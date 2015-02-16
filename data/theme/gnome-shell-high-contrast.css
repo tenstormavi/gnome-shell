@@ -415,7 +415,7 @@ StScrollBar {
   -arrow-border-color: black;
   -arrow-base: 24px;
   -arrow-rise: 11px;
-  -arrow-box-shadow: 0 1px 3px red; }
+  -arrow-box-shadow: 0 1px 3px black; }
 
 .popup-separator-menu-item {
   height: 1px;
@@ -986,11 +986,6 @@ StScrollBar {
   background-color: rgba(238, 238, 236, 0.1);
   transition-duration: 200ms; }
 
-.app-well-app.running .overview-icon,
-.app-well-app.app-folder.running .overview-icon,
-.show-apps.running .overview-icon,
-.grid-search-result.running .overview-icon {
-  text-shadow: black 0px 2px 2px; }
 .app-well-app:active .overview-icon, .app-well-app:checked .overview-icon,
 .app-well-app.app-folder:active .overview-icon,
 .app-well-app.app-folder:checked .overview-icon,
@@ -1279,11 +1274,9 @@ StScrollBar {
 
 .hotplug-resident-mount {
   spacing: 8px;
-  border-radius: 4px;
-  color: green; }
+  border-radius: 4px; }
   .hotplug-resident-mount:hover {
-    color: red;
-    background-color: blue; }
+    background-color: rgba(0, 0, 0, 0.3); }
 
 .hotplug-resident-mount-label {
   color: inherit;
@@ -1353,9 +1346,9 @@ StScrollBar {
     text-shadow: none;
     icon-shadow: none; }
   .keyboard-key:grayed {
-    background-color: green;
-    color: red;
-    border-color: blue; }
+    background-color: #2e3436;
+    color: #eeeeec;
+    border-color: rgba(0, 0, 0, 0.7); }
 
 .keyboard-subkeys {
   color: white;
