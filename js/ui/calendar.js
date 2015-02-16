@@ -1054,7 +1054,7 @@ const Message = new Lang.Class({
         this._closeButton = new St.Button({ child: closeIcon, visible: false });
         titleBox.add_actor(this._closeButton);
 
-        this.bodyLabel = new URLHighlighter(body, false, this._useBodyMarkup);
+        this.bodyLabel = new URLHighlighter(body || '', false, this._useBodyMarkup);
         this.bodyLabel.actor.add_style_class_name('message-body');
         contentBox.add_actor(this.bodyLabel.actor);
 
