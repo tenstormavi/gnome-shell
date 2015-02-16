@@ -360,8 +360,7 @@ const FdoNotificationDaemon = new Lang.Class({
         // the 'image-data' hint. These applications don't typically pass in 'app_icon'
         // argument to Notify() and actually expect the pixbuf to be shown as an icon.
         // So the logic here does the right thing for this case. If both an icon and either
-        // one of 'image-data' or 'image-path' are specified, we show both an icon and
-        // a large image.
+        // one of 'image-data' or 'image-path' are specified, the icon and takes precedence.
         if (!gicon && gimage)
             gicon = gimage;
         else if (!gicon)
