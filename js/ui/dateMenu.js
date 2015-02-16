@@ -153,6 +153,7 @@ const WorldClocksSection = new Lang.Class({
         let title = (this._locations.length == 0) ? _("Add world clocks...")
                                                   : _("World Clocks");
         let header = new St.Label({ style_class: 'world-clocks-header',
+                                    x_align: Clutter.ActorAlign.START,
                                     text: title });
         layout.attach(header, 0, 0, 2, 1);
 
@@ -163,12 +164,18 @@ const WorldClocksSection = new Lang.Class({
                                        text: l.get_city_name(),
                                        x_align: Clutter.ActorAlign.START,
                                        x_expand: true });
-            layout.attach(label, 0, i + 1, 1, 1);
 
             let time = new St.Label({ style_class: 'world-clocks-time',
                                       x_align: Clutter.ActorAlign.END,
                                       x_expand: true });
-            layout.attach(time, 1, i + 1, 1, 1);
+
+            if (this._grid.text_direction == Clutter.TextDirection.RTL) {
+                layout.attach(time, 0, i + 1, 1, 1);
+                layout.attach(label, 1, i + 1, 1, 1);
+            } else {
+                layout.attach(label, 0, i + 1, 1, 1);
+                layout.attach(time, 1, i + 1, 1, 1);
+            }
 
             this._locations[i].actor = time;
         }
