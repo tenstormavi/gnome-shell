@@ -1054,7 +1054,7 @@ const Message = new Lang.Class({
         this._closeButton = new St.Button({ child: closeIcon, visible: false });
         titleBox.add_actor(this._closeButton);
 
-        this.bodyLabel = new URLHighlighter(body, false, false);
+        this.bodyLabel = new URLHighlighter(body, false, this._useBodyMarkup);
         this.bodyLabel.actor.add_style_class_name('message-body');
         contentBox.add_actor(this.bodyLabel.actor);
 
@@ -1074,6 +1074,14 @@ const Message = new Lang.Class({
 
     setSecondaryActor: function(actor) {
         this._secondaryBin.child = actor;
+    },
+
+    setUseBodyMarkup: function(enable) {
+        if (this._useBodyMarkup === enable)
+            return;
+        this._useBodyMarkup = enable;
+        if (this.bodyLabel)
+            this.bodyLabel.setMarkup(this.bodyLabel.actor.text, enable);
     },
 
     canClear: function() {
