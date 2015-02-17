@@ -14,6 +14,7 @@ const Shell = imports.gi.Shell;
 const Signals = imports.signals;
 const St = imports.gi.St;
 
+const Calendar = imports.ui.calendar;
 const GnomeSession = imports.misc.gnomeSession;
 const Layout = imports.ui.layout;
 const Main = imports.ui.main;
@@ -1011,6 +1012,53 @@ const Notification = new Lang.Class({
     }
 });
 Signals.addSignalMethods(Notification.prototype);
+
+const NotificationBanner = new Lang.Class({
+    Name: 'NotificationBanner',
+    Extends: Calendar.NotificationMessage,
+
+    _init: function(notification) {
+        this.parent(notification);
+
+        this.actor.add_style_class_name('notification-banner');
+
+        this._buttonBox = null;
+    },
+
+    addButton: function(button, callback) {
+        if (!this._buttonBox) {
+            this._buttonBox = new St.BoxLayout({ style_class: 'notification-actions',
+                                                 x_expand: true });
+            this.setActionArea(this._buttonBox);
+            global.focus_manager.add_group(this._buttonBox);
+        }
+
+        this._buttonBox.add(button);
+        button.connect('clicked', Lang.bind(this, function() {
+            callback();
+
+            if (!this.notification.resident) {
+                // We don't hide a resident notification when the user invokes one of its actions,
+                // because it is common for such notifications to update themselves with new
+                // information based on the action. We'd like to display the updated information
+                // in place, rather than pop-up a new notification.
+                this.emit('done-displaying');
+                this.notification.destroy();
+            }
+        }));
+
+        return button;
+    },
+
+    addAction: function(label, callback) {
+        let button = new St.Button({ style_class: 'notification-button',
+                                     label: label,
+                                     x_expand: true,
+                                     can_focus: true });
+
+        return this.addButton(button, callback);
+    }
+});
 
 const SourceActor = new Lang.Class({
     Name: 'SourceActor',

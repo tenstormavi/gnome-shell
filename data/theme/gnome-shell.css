@@ -1608,6 +1608,13 @@ StScrollBar StButton#vhandle:active {
     link-color: #ccccff;
 }
 
+.notification-banner {
+    border-radius: 5px;
+    margin: 5px;
+    background-color: rgb(72,72,72);
+    border: 1px solid rgb(35,40,41);
+}
+
 .notification {
     border-radius: 5px;
     margin: 5px;
@@ -1624,7 +1631,7 @@ StScrollBar StButton#vhandle:active {
     spacing: 5px;
 }
 
-.notification, #notification-container {
+.notification, .notification-banner, #notification-container {
     font-size: 11pt;
     width: 34em;
 }
