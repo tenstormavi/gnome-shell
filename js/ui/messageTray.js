@@ -146,127 +146,6 @@ const FocusGrabber = new Lang.Class({
     }
 });
 
-const URLHighlighter = new Lang.Class({
-    Name: 'URLHighlighter',
-
-    _init: function(text, allowMarkup) {
-        if (!text)
-            text = '';
-        this.actor = new St.Label({ reactive: true, style_class: 'url-highlighter' });
-        this._linkColor = '#ccccff';
-        this.actor.connect('style-changed', Lang.bind(this, function() {
-            let [hasColor, color] = this.actor.get_theme_node().lookup_color('link-color', false);
-            if (hasColor) {
-                let linkColor = color.to_string().substr(0, 7);
-                if (linkColor != this._linkColor) {
-                    this._linkColor = linkColor;
-                    this._highlightUrls();
-                }
-            }
-        }));
-        this.actor.clutter_text.line_wrap = true;
-        this.actor.clutter_text.line_wrap_mode = Pango.WrapMode.WORD_CHAR;
-
-        this.setMarkup(text, allowMarkup);
-        this.actor.connect('button-press-event', Lang.bind(this, function(actor, event) {
-            // Don't try to URL highlight when invisible.
-            // The MessageTray doesn't actually hide us, so
-            // we need to check for paint opacities as well.
-            if (!actor.visible || actor.get_paint_opacity() == 0)
-                return Clutter.EVENT_PROPAGATE;
-
-            // Keep Notification.actor from seeing this and taking
-            // a pointer grab, which would block our button-release-event
-            // handler, if an URL is clicked
-            return this._findUrlAtPos(event) != -1;
-        }));
-        this.actor.connect('button-release-event', Lang.bind(this, function (actor, event) {
-            if (!actor.visible || actor.get_paint_opacity() == 0)
-                return Clutter.EVENT_PROPAGATE;
-
-            let urlId = this._findUrlAtPos(event);
-            if (urlId != -1) {
-                let url = this._urls[urlId].url;
-                if (url.indexOf(':') == -1)
-                    url = 'http://' + url;
-
-                Gio.app_info_launch_default_for_uri(url, global.create_app_launch_context(0, -1));
-                return Clutter.EVENT_STOP;
-            }
-            return Clutter.EVENT_PROPAGATE;
-        }));
-        this.actor.connect('motion-event', Lang.bind(this, function(actor, event) {
-            if (!actor.visible || actor.get_paint_opacity() == 0)
-                return Clutter.EVENT_PROPAGATE;
-
-            let urlId = this._findUrlAtPos(event);
-            if (urlId != -1 && !this._cursorChanged) {
-                global.screen.set_cursor(Meta.Cursor.POINTING_HAND);
-                this._cursorChanged = true;
-            } else if (urlId == -1) {
-                global.screen.set_cursor(Meta.Cursor.DEFAULT);
-                this._cursorChanged = false;
-            }
-            return Clutter.EVENT_PROPAGATE;
-        }));
-        this.actor.connect('leave-event', Lang.bind(this, function() {
-            if (!this.actor.visible || this.actor.get_paint_opacity() == 0)
-                return Clutter.EVENT_PROPAGATE;
-
-            if (this._cursorChanged) {
-                this._cursorChanged = false;
-                global.screen.set_cursor(Meta.Cursor.DEFAULT);
-            }
-            return Clutter.EVENT_PROPAGATE;
-        }));
-    },
-
-    setMarkup: function(text, allowMarkup) {
-        text = text ? _fixMarkup(text, allowMarkup) : '';
-        this._text = text;
-
-        this.actor.clutter_text.set_markup(text);
-        /* clutter_text.text contain text without markup */
-        this._urls = Util.findUrls(this.actor.clutter_text.text);
-        this._highlightUrls();
-    },
-
-    _highlightUrls: function() {
-        // text here contain markup
-        let urls = Util.findUrls(this._text);
-        let markup = '';
-        let pos = 0;
-        for (let i = 0; i < urls.length; i++) {
-            let url = urls[i];
-            let str = this._text.substr(pos, url.pos - pos);
-            markup += str + '<span foreground="' + this._linkColor + '"><u>' + url.url + '</u></span>';
-            pos = url.pos + url.url.length;
-        }
-        markup += this._text.substr(pos);
-        this.actor.clutter_text.set_markup(markup);
-    },
-
-    _findUrlAtPos: function(event) {
-        let success;
-        let [x, y] = event.get_coords();
-        [success, x, y] = this.actor.transform_stage_point(x, y);
-        let find_pos = -1;
-        for (let i = 0; i < this.actor.clutter_text.text.length; i++) {
-            let [success, px, py, line_height] = this.actor.clutter_text.position_to_coords(i);
-            if (py > y || py + line_height < y || x < px)
-                continue;
-            find_pos = i;
-        }
-        if (find_pos != -1) {
-            for (let i = 0; i < this._urls.length; i++)
-            if (find_pos >= this._urls[i].pos &&
-                this._urls[i].pos + this._urls[i].url.length > find_pos)
-                return i;
-        }
-        return -1;
-    }
-});
-
 // NotificationPolicy:
 // An object that holds all bits of configurable policy related to a notification
 // source, such as whether to play sound or honour the critical bit.
@@ -413,107 +292,6 @@ const NotificationApplicationPolicy = new Lang.Class({
     }
 });
 
-const LabelExpanderLayout = new Lang.Class({
-    Name: 'LabelExpanderLayout',
-    Extends: Clutter.LayoutManager,
-    Properties: { 'expansion': GObject.ParamSpec.double('expansion',
-                                                        'Expansion',
-                                                        'Expansion of the layout, between 0 (collapsed) ' +
-                                                        'and 1 (fully expanded',
-                                                         GObject.ParamFlags.READABLE | GObject.ParamFlags.WRITABLE,
-                                                         0, 1, 0)},
-
-    _init: function(params) {
-        this._expansion = 0;
-        this.expandLines = 6;
-
-        this.parent(params);
-    },
-
-    get expansion() {
-        return this._expansion;
-    },
-
-    set expansion(v) {
-        if (v == this._expansion)
-            return;
-        this._expansion = v;
-        this.notify('expansion');
-
-        let visibleIndex = this._expansion > 0 ? 1 : 0;
-        for (let i = 0; this._container && i < this._container.get_n_children(); i++)
-            this._container.get_child_at_index(i).visible = (i == visibleIndex);
-
-        this.layout_changed();
-    },
-
-    vfunc_set_container: function(container) {
-        this._container = container;
-    },
-
-    vfunc_get_preferred_width: function(container, forHeight) {
-        let [min, nat] = [0, 0];
-
-        for (let i = 0; i < container.get_n_children(); i++) {
-            if (i > 1)
-                break; // we support one unexpanded + one expanded child
-
-            let child = container.get_child_at_index(i);
-            let [childMin, childNat] = child.get_preferred_width(forHeight);
-            [min, nat] = [Math.max(min, childMin), Math.max(nat, childNat)];
-        }
-
-        return [min, nat];
-    },
-
-    vfunc_get_preferred_height: function(container, forWidth) {
-        let [min, nat] = [0, 0];
-
-        let children = container.get_children();
-        if (children[0])
-            [min, nat] = children[0].get_preferred_height(forWidth);
-
-        if (children[1]) {
-            let [min2, nat2] = children[1].get_preferred_height(forWidth);
-            let [expMin, expNat] = [Math.min(min2, min * this.expandLines),
-                                    Math.min(nat2, nat * this.expandLines)];
-            [min, nat] = [min + this._expansion * (expMin - min),
-                          nat + this._expansion * (expNat - nat)];
-        }
-
-        return [min, nat];
-    },
-
-    vfunc_allocate: function(container, box, flags) {
-        for (let i = 0; i < container.get_n_children(); i++) {
-            let child = container.get_child_at_index(i);
-
-            if (!child.visible)
-                continue;
-
-            let xAlign = 0;
-            let xFill = false;
-            if (child.needs_expand(Clutter.Orientation.HORIZONTAL)) {
-                switch(child.get_x_align()) {
-                    case Clutter.ActorAlign.FILL:
-                        xFill = true;
-                        break;
-                    case Clutter.ActorAlign.START:
-                        break;
-                    case Clutter.ActorAlign.CENTER:
-                        xAlign = 0.5;
-                        break;
-                    case Clutter.ActorAlign.END:
-                        xAlign = 1;
-                        break;
-                }
-            }
-            child.allocate_align_fill(box, xAlign, 0, xFill, false, flags);
-        }
-
-    }
-});
-
 // Notification:
 // @source: the notification's Source
 // @title: the title
@@ -570,8 +348,6 @@ const LabelExpanderLayout = new Lang.Class({
 const Notification = new Lang.Class({
     Name: 'Notification',
 
-    ICON_SIZE: 48,
-
     _init: function(source, title, banner, params) {
         this.source = source;
         this.title = title;
@@ -580,70 +356,13 @@ const Notification = new Lang.Class({
         // 'transient' is a reserved keyword in JS, so we have to use an alternate variable name
         this.isTransient = false;
         this.forFeedback = false;
-        this.expanded = false;
-        this.focused = false;
         this._acknowledged = false;
-        this._destroyed = false;
-        this._customContent = false;
         this.bannerBodyText = null;
         this.bannerBodyMarkup = false;
-        this._bannerBodyAdded = false;
-        this._scrollPolicy = Gtk.PolicyType.AUTOMATIC;
         this._soundName = null;
         this._soundFile = null;
         this._soundPlayed = false;
-
-        this.actor = new St.Button({ style_class: 'notification',
-                                     accessible_role: Atk.Role.NOTIFICATION,
-                                     x_fill: true });
-        this.actor._delegate = this;
-        this.actor.connect('clicked', Lang.bind(this, this._onClicked));
-        this.actor.connect('destroy', Lang.bind(this, this._onDestroy));
-        this.actor.connect('notify::hover', Lang.bind(this, this._onHoverChanged));
-
-        this._vbox = new St.BoxLayout({ vertical: true });
-        this.actor.set_child(this._vbox);
-
-        // Using a GridLayout instead of a bunch of nested boxes would be
-        // more natural, but 
-        this._hbox = new St.BoxLayout();
-        this._vbox.add_actor(this._hbox);
-
-        this._iconBin = new St.Bin({ style_class: 'notification-icon',
-                                     y_expand: true });
-        this._iconBin.set_y_align(Clutter.ActorAlign.START);
-        this._hbox.add_actor(this._iconBin);
-
-        this._contentBox = new St.BoxLayout({ style_class: 'notification-content',
-                                              vertical: true, x_expand: true });
-        this._hbox.add_actor(this._contentBox);
-
-        let titleBox = new St.BoxLayout();
-        this._contentBox.add_actor(titleBox);
-
-        this._titleLabel = new St.Label({ x_expand: true,
-                                          x_align: Clutter.ActorAlign.START });
-        titleBox.add_actor(this._titleLabel);
-
-        this._secondaryIcon = new St.Icon({ style_class: 'notification-secondary-icon',
-                                            visible: !this.expanded });
-        titleBox.add_actor(this._secondaryIcon);
-
-        let closeIcon = new St.Icon({ icon_name: 'window-close-symbolic',
-                icon_size: 16 });
-        this._closeButton = new St.Button({ child: closeIcon,
-                                            visible: this.expanded });
-        titleBox.add_actor(this._closeButton);
-
-        this._bannerBodyBin = new St.Widget({ x_expand: true,
-                                              x_align: Clutter.ActorAlign.START });
-        this._bannerBodyBin.layout_manager = new LabelExpanderLayout();
-        this._contentBox.add_actor(this._bannerBodyBin);
-
-        this._closeButton.connect('clicked', Lang.bind(this,
-                    function() {
-                    this.destroy(NotificationDestroyedReason.DISMISSED);
-                    }));
+        this.actions = [];
 
         // If called with only one argument we assume the caller
         // will call .update() later on. This is the case of
@@ -662,82 +381,25 @@ const Notification = new Lang.Class({
     // the title/banner. If @params.clear is %true, it will also
     // remove any additional actors/action buttons previously added.
     update: function(title, banner, params) {
-        params = Params.parse(params, { customContent: false,
-                                        gicon: null,
+        params = Params.parse(params, { gicon: null,
                                         secondaryGIcon: null,
                                         bannerMarkup: false,
                                         clear: false,
                                         soundName: null,
                                         soundFile: null });
 
-        this._customContent = params.customContent;
-
-        let oldFocus = global.stage.key_focus;
-
-        if (this._iconBin.child && (params.gicon || params.clear))
-            this._iconBin.child.destroy();
-
-        if (params.clear)
-            this._secondaryIcon.gicon = null;
-
-        // We always clear the content area if we don't have custom
-        // content because it contains the @banner
-        if (this._scrollArea && (!this._customContent || params.clear)) {
-            if (oldFocus && this._scrollArea.contains(oldFocus))
-                this.actor.grab_key_focus();
-
-            this._scrollArea.destroy();
-            this._scrollArea = null;
-            this._contentArea = null;
-        }
-        if (this._actionArea && params.clear) {
-            if (oldFocus && this._actionArea.contains(oldFocus))
-                this.actor.grab_key_focus();
-
-            this._actionArea.destroy();
-            this._actionArea = null;
-            this._buttonBox = null;
-        }
-
-        if (params.gicon)
-            this._iconBin.child = new St.Icon({ gicon: params.gicon,
-                    icon_size: this.ICON_SIZE });
-        else
-            this._iconBin.child = this.source.createIcon(this.ICON_SIZE);
-
-        if (params.secondaryGIcon)
-            this._secondaryIcon.gicon = params.secondaryGIcon;
-
         this.title = title;
-        title = title ? _fixMarkup(title.replace(/\n/g, ' '), false) : '';
-        this._titleLabel.clutter_text.set_markup('<b>' + title + '</b>');
-
-        let titleDirection;
-        if (Pango.find_base_dir(title, -1) == Pango.Direction.RTL)
-            titleDirection = Clutter.TextDirection.RTL;
-        else
-            titleDirection = Clutter.TextDirection.LTR;
-
-        // Let the title's text direction control the overall direction
-        // of the notification - in case where different scripts are used
-        // in the notification, this is the right thing for the icon, and
-        // arguably for action buttons as well. Labels other than the title
-        // will be allocated at the available width, so that their alignment
-        // is done correctly automatically.
-        // FIXME:
-        ////this._grid.set_text_direction(titleDirection);
-
-        // Unless the notification has custom content, we save this.bannerBodyText
-        // to add it to the content of the notification if the notification is
-        // expandable due to other elements in its content area or due to the banner
-        // not fitting fully in the single-line mode.
-        this.bannerBodyText = this._customContent ? null : banner;
+        this.bannerBodyText = banner;
         this.bannerBodyMarkup = params.bannerMarkup;
-        this._bannerBodyAdded = false;
+
+        if (params.gicon || params.clear)
+            this.gicon = params.gicon;
+
+        if (params.secondaryGIcon || params.clear)
+            this.secondaryGIcon = params.secondaryGIcon;
 
         if (params.clear)
-            this._bannerBodyBin.destroy_all_children();
-        this._addBannerBody();
+            this.actions = [];
 
         if (this._soundName != params.soundName ||
             this._soundFile != params.soundFile) {
@@ -746,135 +408,14 @@ const Notification = new Lang.Class({
             this._soundPlayed = false;
         }
 
-        this.updated();
-    },
-
-    _createScrollArea: function() {
-         this._scrollArea = new St.ScrollView({ style_class: 'notification-scrollview',
-                 vscrollbar_policy: this._scrollPolicy,
-                 hscrollbar_policy: Gtk.PolicyType.NEVER });
-         this._contentBox.add_actor(this._scrollArea);
-
-         this._contentArea = new St.BoxLayout({ style_class: 'notification-body',
-                                                vertical: true });
-         this._scrollArea.add_actor(this._contentArea);
-    },
-
-    // addActor:
-    // @actor: actor to add to the body of the notification
-    //
-    // Appends @actor to the notification's body
-    addActor: function(actor, style) {
-        this._contentBox.add(actor, style ? style : {});
-        this.updated();
-    },
-
-    // addBody:
-    // @text: the text
-    // @markup: %true if @text contains pango markup
-    // @style: style to use when adding the actor containing the text
-    //
-    // Adds a multi-line label containing @text to the notification.
-    //
-    // Return value: the newly-added label
-    addBody: function(text, markup, style) {
-        let label = new URLHighlighter(text, markup);
-
-        this.addActor(label.actor, style);
-        return label.actor;
-    },
-
-    _addBannerBody: function() {
-        if (this.bannerBodyText && !this._bannerBodyAdded) {
-            this._bannerBodyAdded = true;
-
-            let layout = this._bannerBodyBin.layout_manager;
-
-            let label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
-            label.actor.x_expand = true;
-            label.actor.x_align = Clutter.ActorAlign.START;
-            label.actor.clutter_text.single_line_mode = true;
-            this._bannerBodyBin.add_actor(label.actor);
-
-            label = new URLHighlighter(this.bannerBodyText, this.bannerBodyMarkup);
-            label.actor.x_expand = true;
-            label.actor.x_align = Clutter.ActorAlign.START;
-            this._bannerBodyBin.add_actor(label.actor);
-        }
-    },
-
-    // scrollTo:
-    // @side: St.Side.TOP or St.Side.BOTTOM
-    //
-    // Scrolls the content area (if scrollable) to the indicated edge
-    scrollTo: function(side) {
-        let adjustment = this._scrollArea.vscroll.adjustment;
-        if (side == St.Side.TOP)
-            adjustment.value = adjustment.lower;
-        else if (side == St.Side.BOTTOM)
-            adjustment.value = adjustment.upper;
-    },
-
-    // setActionArea:
-    // @actor: the actor
-    //
-    // Puts @actor into the action area of the notification, replacing
-    // the previous contents
-    setActionArea: function(actor) {
-        if (this._actionArea) {
-            this._actionArea.destroy();
-            this._actionArea = null;
-            if (this._buttonBox)
-                this._buttonBox = null;
-        } else {
-            this._addBannerBody();
-        }
-        this._actionArea = actor;
-        this._actionArea.visible = this.expanded;
-
-        this._vbox.add_actor(this._actionArea);
-        this.updated();
-    },
-
-    addButton: function(button, callback) {
-        if (!this._buttonBox) {
-            this._buttonBox = new St.BoxLayout({ style_class: 'notification-actions' });
-            this.setActionArea(this._buttonBox);
-            global.focus_manager.add_group(this._buttonBox);
-        }
-
-        button.x_expand = true;
-        this._buttonBox.add(button);
-        button.connect('clicked', Lang.bind(this, function() {
-            callback();
-
-            if (!this.resident) {
-                // We don't hide a resident notification when the user invokes one of its actions,
-                // because it is common for such notifications to update themselves with new
-                // information based on the action. We'd like to display the updated information
-                // in place, rather than pop-up a new notification.
-                this.emit('done-displaying');
-                this.destroy();
-            }
-        }));
-
-        this.updated();
-        return button;
+        this.emit('updated', params.clear);
     },
 
     // addAction:
     // @label: the label for the action's button
     // @callback: the callback for the action
-    //
-    // Adds a button with the given @label to the notification. All
-    // action buttons will appear in a single row at the bottom of
-    // the notification.
     addAction: function(label, callback) {
-        let button = new St.Button({ style_class: 'notification-button',
-                                     label: label,
-                                     can_focus: true });
-
-        return this.addButton(button, callback);
+        this.actions.push({ label: label, callback: callback });
     },
 
     get acknowledged() {
@@ -902,10 +443,6 @@ const Notification = new Lang.Class({
 
     setForFeedback: function(forFeedback) {
         this.forFeedback = forFeedback;
-    },
-
-    _canExpandContent: function() {
-        return this.bannerBodyText && !this._bannerBodyAdded;
     },
 
     playSound: function() {
@@ -940,75 +477,16 @@ const Notification = new Lang.Class({
         }
     },
 
-    updated: function() {
-        if (this.expanded)
-            this.expand(false);
-    },
-
-    _onHoverChanged: function() {
-        let hovered = this.actor.hover;
-        this._secondaryIcon.visible = !hovered;
-        this._closeButton.visible = hovered;
-    },
-
-    expand: function(animate) {
-        this.expanded = true;
-
-        // Show additional content that we keep hidden in banner mode
-        if (this._actionArea)
-            this._actionArea.show();
-
-        if (animate)
-            Tweener.addTween(this._bannerBodyBin.layout_manager,
-                             { expansion: 1,
-                               time: ANIMATION_TIME,
-                               transition: 'easeOutBack' });
-        else
-            this._bannerBodyBin.layout_manager.expansion = 1;
-
-        this.emit('expanded');
-    },
-
-    collapseCompleted: function() {
-        if (this._destroyed)
-            return;
-        this.expanded = false;
-
-        // Hide additional content that we keep hidden in banner mode
-        if (this._actionArea)
-            this._actionArea.hide();
-        if (this._bannerBodyBin)
-            Tweener.addTween(this._bannerBodyBin.layout_manager,
-                             { expansion: 0, time: 0.2 });
-
-        // Make sure we don't line wrap the title, and ellipsize it instead.
-        this._titleLabel.clutter_text.line_wrap = false;
-        this._titleLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-    },
-
-    _onClicked: function() {
-        this.emit('clicked');
-        // We hide all types of notifications once the user clicks on them because the common
-        // outcome of clicking should be the relevant window being brought forward and the user's
-        // attention switching to the window.
-        this.emit('done-displaying');
+    activate: function() {
+        this.emit('activated');
         if (!this.resident)
             this.destroy();
     },
 
-    _onDestroy: function() {
-        if (this._destroyed)
-            return;
-        this._destroyed = true;
-        if (!this._destroyedReason)
-            this._destroyedReason = NotificationDestroyedReason.DISMISSED;
-        this.emit('destroy', this._destroyedReason);
-    },
-
     destroy: function(reason) {
-        this._destroyedReason = reason;
-        this.actor.destroy();
-        this.actor._delegate = null;
+        if (!reason)
+            reason = NotificationDestroyedReason.DISMISSED;
+        this.emit('destroy', reason);
     }
 });
 Signals.addSignalMethods(Notification.prototype);
