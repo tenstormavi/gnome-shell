@@ -863,7 +863,8 @@ const MessageTray = new Lang.Class({
         this._notificationFocusGrabber = new FocusGrabber(this.actor);
         this._notificationQueue = [];
         this._notification = null;
-        this._notificationClickedId = 0;
+        this._banner = null;
+        this._bannerClickedId = 0;
 
         this._userActiveWhileNotificationShown = false;
 
@@ -884,7 +885,6 @@ const MessageTray = new Lang.Class({
 
         this._notificationState = State.HIDDEN;
         this._notificationTimeoutId = 0;
-        this._notificationExpandedId = 0;
         this._notificationRemoved = false;
 
         this.clearableCount = 0;
@@ -1184,17 +1184,17 @@ const MessageTray = new Lang.Class({
             let expired = (this._userActiveWhileNotificationShown &&
                            this._notificationTimeoutId == 0 &&
                            this._notification.urgency != Urgency.CRITICAL &&
-                           !this._notification.focused &&
+                           !this._banner.focused &&
                            !this._pointerInNotification) || this._notificationExpired;
             let mustClose = (this._notificationRemoved || !hasNotifications || expired);
 
             if (mustClose) {
                 let animate = hasNotifications && !this._notificationRemoved;
                 this._hideNotification(animate);
-            } else if (this._pointerInNotification && !this._notification.expanded) {
-                this._expandNotification(false);
+            } else if (this._pointerInNotification && !this._banner.expanded) {
+                this._expandBanner(false);
             } else if (this._pointerInNotification) {
-                this._ensureNotificationFocused();
+                this._ensureBannerFocused();
             }
         }
 
@@ -1245,14 +1245,14 @@ const MessageTray = new Lang.Class({
             this.idleMonitor.add_user_active_watch(Lang.bind(this, this._onIdleMonitorBecameActive));
         }
 
-        this._notificationClickedId = this._notification.connect('done-displaying',
-                                                                 Lang.bind(this, this._escapeTray));
-        this._notificationUnfocusedId = this._notification.connect('unfocused', Lang.bind(this, function() {
+        this._banner = new NotificationBanner(this._notification);
+        this._bannerClickedId = this._banner.connect('done-displaying',
+                                                     Lang.bind(this, this._escapeTray));
+        this._bannerUnfocusedId = this._banner.connect('unfocused', Lang.bind(this, function() {
             this._updateState();
         }));
-        this._notificationBin.child = this._notification.actor;
-
-        this._notificationBin.y = -this._notification.actor.height;
+        this._notificationBin.child = this._banner.actor;
+        this._notificationBin.y = -this._banner.actor.height;
 
         this._updateShowingNotification();
 
@@ -1281,7 +1281,7 @@ const MessageTray = new Lang.Class({
         // is on in the control center.
         if (this._notification.urgency == Urgency.CRITICAL ||
             this._notification.source.policy.forceExpanded)
-            this._expandNotification(true);
+            this._expandBanner(true);
 
         // We tween all notifications to full opacity. This ensures that both new notifications and
         // notifications that might have been in the process of hiding get full opacity.
@@ -1354,17 +1354,13 @@ const MessageTray = new Lang.Class({
     _hideNotification: function(animate) {
         this._notificationFocusGrabber.ungrabFocus();
 
-        if (this._notificationExpandedId) {
-            this._notification.disconnect(this._notificationExpandedId);
-            this._notificationExpandedId = 0;
+        if (this._bannerClickedId) {
+            this._banner.disconnect(this._bannerClickedId);
+            this._bannerClickedId = 0;
         }
-        if (this._notificationClickedId) {
-            this._notification.disconnect(this._notificationClickedId);
-            this._notificationClickedId = 0;
-        }
-        if (this._notificationUnfocusedId) {
-            this._notification.disconnect(this._notificationUnfocusedId);
-            this._notificationUnfocusedId = 0;
+        if (this._bannerUnfocusedId) {
+            this._banner.disconnect(this._bannerUnfocusedId);
+            this._bannerUnfocusedId = 0;
         }
 
         this._resetNotificationLeftTimeout();
@@ -1390,8 +1386,6 @@ const MessageTray = new Lang.Class({
     },
 
     _hideNotificationCompleted: function() {
-        this._notification.collapseCompleted();
-
         let notification = this._notification;
         this._notification = null;
         if (notification.isTransient)
@@ -1399,26 +1393,28 @@ const MessageTray = new Lang.Class({
 
         this._pointerInNotification = false;
         this._notificationRemoved = false;
-        this._notificationBin.child = null;
+
+        this._banner.actor.destroy();
+        this._banner = null;
     },
 
     _expandActiveNotification: function() {
-        if (!this._notification)
+        if (!this._banner)
             return;
 
-        this._expandNotification(false);
+        this._expandBanner(false);
     },
 
-    _expandNotification: function(autoExpanding) {
+    _expandBanner: function(autoExpanding) {
         // Don't animate changes in notifications that are auto-expanding.
-        this._notification.expand(!autoExpanding);
+        this._banner.expand(!autoExpanding);
 
         // Don't focus notifications that are auto-expanding.
         if (!autoExpanding)
-            this._ensureNotificationFocused();
+            this._ensureBannerFocused();
     },
 
-    _ensureNotificationFocused: function() {
+    _ensureBannerFocused: function() {
         this._notificationFocusGrabber.grabFocus();
     }
 });
