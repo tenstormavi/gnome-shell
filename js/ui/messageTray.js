@@ -706,7 +706,6 @@ const Source = new Lang.Class({
         this.iconName = iconName;
 
         this.isChat = false;
-        this.isMuted = false;
 
         this.notifications = [];
 
@@ -740,13 +739,6 @@ const Source = new Lang.Class({
     setTitle: function(newTitle) {
         this.title = newTitle;
         this.emit('title-changed');
-    },
-
-    setMuted: function(muted) {
-        if (!this.isChat || this.isMuted == muted)
-            return;
-        this.isMuted = muted;
-        this.emit('muted-changed');
     },
 
     createBanner: function(notification) {
@@ -796,15 +788,10 @@ const Source = new Lang.Class({
         notification.acknowledged = false;
         this.pushNotification(notification);
 
-        if (!this.isMuted) {
-            // Play the sound now, if banners are disabled.
-            // Otherwise, it will be played when the notification
-            // is next shown.
-            if (this.policy.showBanners) {
-                this.emit('notify', notification);
-            } else {
-                notification.playSound();
-            }
+        if (this.policy.showBanners) {
+            this.emit('notify', notification);
+        } else {
+            notification.playSound();
         }
     },
 
@@ -971,7 +958,6 @@ const MessageTray = new Lang.Class({
             source: source,
             notifyId: 0,
             destroyId: 0,
-            mutedChangedId: 0
         };
 
         if (source.isClearable)
@@ -981,13 +967,6 @@ const MessageTray = new Lang.Class({
 
         obj.notifyId = source.connect('notify', Lang.bind(this, this._onNotify));
         obj.destroyId = source.connect('destroy', Lang.bind(this, this._onSourceDestroy));
-        obj.mutedChangedId = source.connect('muted-changed', Lang.bind(this,
-            function () {
-                if (source.isMuted)
-                    this._notificationQueue = this._notificationQueue.filter(function(notification) {
-                        return source != notification.source;
-                    });
-            }));
 
         this.emit('source-added', source);
     },
@@ -1001,7 +980,6 @@ const MessageTray = new Lang.Class({
 
         source.disconnect(obj.notifyId);
         source.disconnect(obj.destroyId);
-        source.disconnect(obj.mutedChangedId);
 
         this.emit('source-removed', source);
     },
