@@ -513,10 +513,8 @@ const NotificationBanner = new Lang.Class({
 
         this._buttonBox = null;
 
-        this.notification.actions.forEach(Lang.bind(this,
-            function(action) {
-                this.addAction(action.label, action.callback);
-            }));
+        this._addActions();
+        this._addSecondaryIcon();
 
         this._activatedId = this.notification.connect('activated',
             Lang.bind(this, function() {
@@ -530,6 +528,33 @@ const NotificationBanner = new Lang.Class({
 
     _onDestroyed: function() {
         this.notification.disconnect(this._activatedId);
+    },
+
+    _onUpdated: function(n, clear) {
+        this.parent(n, clear);
+
+        if (clear) {
+            this.setSecondaryActor(null);
+            this.setActionArea(null);
+            this._buttonBox = null;
+        }
+
+        this._addActions();
+        this._addSecondaryIcon();
+    },
+
+    _addActions: function() {
+        this.notification.actions.forEach(Lang.bind(this,
+            function(action) {
+                this.addAction(action.label, action.callback);
+            }));
+    },
+
+    _addSecondaryIcon: function() {
+        if (this.notification.secondaryGIcon) {
+            let icon = new St.Icon({ gicon: this.notification.secondaryGIcon });
+            this.setSecondaryActor(icon);
+        }
     },
 
     addButton: function(button, callback) {
