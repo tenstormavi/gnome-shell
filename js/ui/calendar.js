@@ -1299,33 +1299,32 @@ const NotificationMessage = new Lang.Class({
     Extends: Message,
 
     _init: function(notification) {
+        this.notification = notification;
+
         this.setUseBodyMarkup(notification.bannerBodyMarkup);
         this.parent(notification.title, notification.bannerBodyText);
 
-        let gicon = null;
-        if (notification._iconBin.child)
-            gicon = notification._iconBin.child.gicon;
         let icon;
-        if (gicon)
-            icon = new St.Icon({ gicon: gicon, icon_size: 48 });
+        if (notification.gicon)
+            icon = new St.Icon({ gicon: notification.gicon, icon_size: 48 });
         else
-            icon = source.createIcon(48);
+            icon = notification.source.createIcon(48);
 
         this.setIcon(icon);
 
-        this.notification = notification;
-
         this.actor.connect('clicked', Lang.bind(this,
             function() {
-                notification._onClicked();
+                this.notification.activate();
             }));
         this.connect('close', Lang.bind(this,
             function() {
+                this._closed = true;
                 this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
             }));
         this.notification.connect('destroy', Lang.bind(this,
             function() {
-                this.emit('close');
+                if (!this._closed)
+                    this.emit('close');
             }));
     },
 
