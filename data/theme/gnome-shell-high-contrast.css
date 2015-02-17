@@ -404,6 +404,10 @@ StScrollBar {
     -boxpointer-gap: 4px;
     margin-bottom: 1.75em; }
 
+.panel-menu {
+  -boxpointer-gap: 4px;
+  margin-bottom: 1.75em; }
+
 .popup-menu-ornament {
   text-align: right;
   width: 1em; }
@@ -588,9 +592,56 @@ StScrollBar {
   #panel .screencast-indicator {
     color: #f57900; }
 
+#calendarArea {
+  padding: 0.75em 1.0em; }
+
+.datemenu-today-button,
+.calendar,
+.datemenu-displays-box,
+.message-list-sections {
+  margin: 0 1.5em; }
+
+.datemenu-calendar-column {
+  spacing: 0.5em;
+  padding-bottom: 3em; }
+
 .calendar {
-  padding: .4em 1.75em .8em 1.75em;
-  margin-bottom: 2em; }
+  margin-bottom: 1em; }
+
+.message-list-section-title,
+.datemenu-today-button,
+.world-clocks-button {
+  border-radius: 4px;
+  padding: .4em; }
+
+.message-list-section-list:ltr {
+  padding-left: .4em; }
+
+.message-list-section-list:rtl {
+  padding-right: .4em; }
+
+.message-list-section-title:hover, .message-list-section-title:focus,
+.datemenu-today-button:hover,
+.datemenu-today-button:focus,
+.world-clocks-button:hover,
+.world-clocks-button:focus {
+  background-color: #0d0d0d; }
+.message-list-section-title:active,
+.datemenu-today-button:active,
+.world-clocks-button:active {
+  color: white;
+  background-color: #215d9c; }
+
+.datemenu-today-button .date-label {
+  font-size: 1.5em; }
+
+.world-clocks-header,
+.message-list-section-title {
+  color: #999999;
+  font-weight: bold; }
+
+.world-clocks-grid {
+  spacing-rows: 0.4em; }
 
 .datemenu-date-label {
   padding: .4em 1.7em;
@@ -598,11 +649,6 @@ StScrollBar {
   color: #fff;
   font-weight: bold;
   font-size: 110%; }
-
-.calendar-vertical-separator {
-  width: .3em;
-  -stipple-width: 1px;
-  -stipple-color: rgba(238, 238, 236, 0.2); }
 
 .calendar-month-label {
   color: #f2f2f2;
@@ -673,39 +719,54 @@ StScrollBar {
   color: rgba(255, 255, 255, 0.15);
   opacity: 0.5; }
 
-.events-table {
-  width: 15em;
-  spacing-columns: 1em;
-  padding: 0 1.4em; }
-  .events-table:ltr {
-    padding-right: 1.9em; }
-  .events-table:rtl {
-    padding-left: 1.9em; }
+/* Message list */
+.message-list {
+  width: 340px; }
 
-.events-day-header {
-  font-weight: bold;
-  color: #e6e6e6;
-  padding-left: 0;
-  padding-top: 1.2em; }
-  .events-day-header:first-child {
-    padding-top: 0; }
+.message-list-sections {
+  spacing: 1.5em; }
 
-.events-day-dayname {
-  color: #e6e6e6;
-  text-align: left;
-  min-width: 20px; }
-  .events-day-dayname:rtl {
-    text-align: right; }
-  .events-day-dayname .events-day-time {
-    text-align: right; }
-    .events-day-dayname .events-day-time:rtl {
-      text-align: left; }
-  .events-day-dayname .events-day-task {
-    color: #e6e6e6; }
-    .events-day-dayname .events-day-task:ltr {
-      padding-left: 8px; }
-    .events-day-dayname .events-day-task:rtl {
-      padding-right: 8px; }
+.message-list-section,
+.message-list-section-list {
+  spacing: 0.7em; }
+
+.message-list-section-title-box {
+  spacing: 0.4em; }
+
+.message-list-section-close > StIcon {
+  icon-size: 16px;
+  border-radius: 8px;
+  color: #000;
+  background-color: #666666; }
+
+/* FIXME: how do you do this in sass? */
+.message-list-section-close:hover > StIcon,
+.message-list-section-close:focus > StIcon {
+  background-color: #999999; }
+
+.message {
+  background-color: #0d0d0d; }
+  .message:hover, .message:focus {
+    background-color: #262626; }
+
+.message-icon-bin {
+  padding: 5px; }
+
+.message-icon-bin > StIcon {
+  icon-size: 48px; }
+
+.message-secondary-bin {
+  color: #999999; }
+
+.message-secondary-bin > StIcon {
+  icon-size: 16px; }
+
+.message-title {
+  font-weight: bold; }
+
+.message-content {
+  padding: 5px;
+  spacing: 5px; }
 
 .system-switch-user-submenu-icon {
   icon-size: 24px;
@@ -755,7 +816,7 @@ StScrollBar {
 .popup-menu-icon {
   icon-size: 1.09em; }
 
-.window-close, .notification-close {
+.window-close {
   background-image: url("close-window.svg");
   background-size: 32px;
   height: 32px;
@@ -765,12 +826,6 @@ StScrollBar {
   -shell-close-overlap: 16px; }
   .window-close:rtl {
     -st-background-image-shadow: 2px 2px 6px rgba(0, 0, 0, 0.5); }
-
-.notification-close {
-  -shell-close-overlap-x: 14px;
-  -shell-close-overlap-y: -12px; }
-  .notification-close:rtl {
-    -shell-close-overlap-x: -14px; }
 
 /* NETWORK DIALOGS */
 .nm-dialog {
@@ -1122,80 +1177,38 @@ StScrollBar {
 .url-highlighter {
   link-color: #215d9c; }
 
-.notification {
+.notification-banner {
   font-size: 11pt;
   width: 34em;
-  border-radius: 6px 6px 0 0;
+  margin: 5px;
+  border-radius: 6px;
   color: #eeeeec;
   background-color: #2e3436;
-  border: 1px solid black;
-  border-bottom-width: 0;
-  spacing-rows: 4px;
-  padding: 8px 8px 4px 8px;
-  spacing-columns: 10px; }
-  .notification.multi-line-notification {
-    padding-bottom: 8px; }
+  border: 1px solid black; }
+  .notification-banner:hover {
+    background-color: #2e3436; }
 
-.notification-unexpanded {
-  min-height: 36px;
-  height: 36px; }
+.notification-icon {
+  padding: 5px; }
 
-.notification-with-image {
-  min-height: 159px; }
-
-.notification-body {
+.notification-content {
+  padding: 5px;
   spacing: 5px; }
 
 .notification-actions {
-  paddinf-top: 18px;
-  spacing: 6px; }
+  background-color: black;
+  padding-top: 2px;
+  spacing: 1px; }
 
-.summary-source {
-  border-radius: 0;
-  -st-natural-width: 60px;
-  padding: 9px;
-  transition-duration: 100ms; }
-
-.summary-source-button:hover .summary-source, .summary-source-button:selected .summary-source, .summary-source-button:focus .summary-source {
-  background-color: #33393c; }
-
-.summary-source-counter {
-  font-size: 10pt;
-  font-weight: bold;
-  height: 1.6em;
-  width: 1.6em;
-  -shell-counter-overlap-x: 3px;
-  -shell-counter-overlap-y: 3px;
-  background-color: #215d9c;
-  color: #ffffff;
-  border: 2px solid #eeeeec;
-  box-shadow: 0 2px 2px rgba(0, 0, 0, 0.5);
-  border-radius: 0.9em; }
-
-.summary-boxpointer {
-  -arrow-border-radius: 15px;
-  -arrow-background-color: #2e3436;
-  -arrow-base: 36px;
-  -arrow-rise: 18px;
-  color: #fff;
-  -boxpointer-gap: 4px; }
-  .summary-boxpointer .notification {
-    border-radius: 9px;
-    border-width: 0;
-    background-color: transparent !important;
-    padding-bottom: 12px; }
-  .summary-boxpointer #summary-right-click-menu {
-    padding-top: 12px;
-    padding-bottom: 12px; }
-
-.summary-notification-stack-scrollview {
-  max-height: 24em;
-  padding-top: 8px;
-  padding-bottom: 8px; }
-  .summary-notification-stack-scrollview:ltr {
-    padding-right: 8px; }
-  .summary-notification-stack-scrollview:rtl {
-    padding-left: 8px; }
+.notification-button {
+  padding: 4px 4px 5px;
+  background-color: #222728; }
+  .notification-button:first-child {
+    border-radius: 0 0 0 6px; }
+  .notification-button:last-child {
+    border-radius: 0 0 6px 0; }
+  .notification-button:hover, .notification-buttonfocus {
+    background-color: #292f30; }
 
 .notification-scrollview {
   max-height: 18em;
@@ -1204,9 +1217,6 @@ StScrollBar {
     padding-left: 6px; }
   .notification-scrollview:rtl > StScrollBar {
     padding-right: 6px; }
-
-.notification-button {
-  height: 24px; }
 
 .notification-icon-button {
   border-radius: 5px;
@@ -1221,6 +1231,9 @@ StScrollBar {
 
 .secondary-icon {
   icon-size: 1.09em; }
+
+.chat-body {
+  spacing: 5px; }
 
 .chat-log-message {
   color: #e6e6e6; }
@@ -1268,31 +1281,6 @@ StScrollBar {
 .hotplug-notification-item-icon {
   icon-size: 24px;
   padding: 2px 5px; }
-
-.hotplug-resident-box {
-  spacing: 8px; }
-
-.hotplug-resident-mount {
-  spacing: 8px;
-  border-radius: 4px; }
-  .hotplug-resident-mount:hover {
-    background-color: rgba(0, 0, 0, 0.3); }
-
-.hotplug-resident-mount-label {
-  color: inherit;
-  padding-left: 6px; }
-
-.hotplug-resident-mount-icon {
-  icon-size: 24px;
-  padding-left: 6px; }
-
-.hotplug-resident-eject-icon {
-  icon-size: 16px; }
-
-.hotplug-resident-eject-button {
-  padding: 7px;
-  border-radius: 5px;
-  color: pink; }
 
 /* Eeeky things */
 .magnifier-zoom-region {
@@ -1682,3 +1670,5 @@ StScrollBar {
 
 stage {
   -st-icon-style: symbolic; }
+
+/*# sourceMappingURL=gnome-shell-high-contrast.css.map */
