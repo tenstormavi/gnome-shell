@@ -1593,6 +1593,18 @@ StScrollBar StButton#vhandle:active {
     padding: 5px;
 }
 
+.message-icon-bin > StIcon {
+    icon-size: 48px;
+}
+
+.message-secondary-bin {
+    color: rgb(136,138,133);
+}
+
+.message-secondary-bin > StIcon {
+    icon-size: 16px;
+}
+
 .message-title {
     font-weight: bold;
 }
