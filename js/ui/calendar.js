@@ -26,8 +26,6 @@ const MSECS_IN_DAY = 24 * 60 * 60 * 1000;
 const SHOW_WEEKDATE_KEY = 'show-weekdate';
 const ELLIPSIS_CHAR = '\u2026';
 
-const MAX_NOTIFICATION_BUTTONS = 3;
-
 const MESSAGE_ANIMATION_TIME = 0.1;
 
 // alias to prevent xgettext from picking up strings translated in GTK+
