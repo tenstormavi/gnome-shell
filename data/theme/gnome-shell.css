@@ -492,7 +492,7 @@ StScrollBar StButton#vhandle:active {
 
 .search-entry,
 .login-dialog StEntry,
-.notification StEntry,
+.notification-banner StEntry,
 .modal-dialog StEntry {
     color: rgb(64, 64, 64);
     caret-color: rgb(64, 64, 64);
@@ -505,7 +505,7 @@ StScrollBar StButton#vhandle:active {
 .search-entry,
 .login-dialog StEntry,
 .run-dialog-entry,
-.notification StEntry {
+.notification-banner StEntry {
     border: 2px solid rgba(245,245,245,0.2);
     background-gradient-start: rgba(5,5,6,0.1);
     background-gradient-end: rgba(254,254,254,0.1);
@@ -517,7 +517,7 @@ StScrollBar StButton#vhandle:active {
 .search-entry:focus,
 .search-entry:hover,
 .login-dialog StEntry:focus,
-.notification StEntry:focus,
+.notification-banner StEntry:focus,
 .modal-dialog StEntry {
     border: 2px solid rgb(136,138,133);
     background-gradient-start: rgb(200,200,200);
@@ -527,7 +527,7 @@ StScrollBar StButton#vhandle:active {
 }
 
 .login-dialog StEntry:focus,
-.notification StEntry:focus,
+.notification-banner StEntry:focus,
 .modal-dialog StEntry:focus {
     border: 2px solid #3465a4;
 }
@@ -551,7 +551,7 @@ StScrollBar StButton#vhandle:active {
 }
 
 .login-dialog StEntry,
-.notification StEntry,
+.notification-banner StEntry,
 .modal-dialog StEntry {
     border-radius: 5px;
     padding: 4px 4px;
@@ -1648,23 +1648,6 @@ StScrollBar StButton#vhandle:active {
     width: 34em;
 }
 
-.notification-scrollview {
-    max-height: 10em;
-    -st-vfade-offset: 24px;
-}
-
-.notification-scrollview:ltr > StScrollBar {
-    padding-left: 6px;
-}
-
-.notification-scrollview:rtl > StScrollBar {
-    padding-right: 6px;
-}
-
-.notification-body {
-    spacing: 5px;
-}
-
 .notification-actions {
     background-color: rgb(35,40,41);
     padding-top: 2px;
@@ -1711,6 +1694,11 @@ StScrollBar StButton#vhandle:active {
     padding: 2px 5px;
 }
 
+.chat-response {
+    border-radius: 4px;
+    margin: 4px;
+}
+
 .chat-log-message {
     color: #888888;
 }
@@ -1750,16 +1738,21 @@ StScrollBar StButton#vhandle:active {
     padding-right: 4px;
 }
 
-.chat-notification-scrollview{
+.chat-scrollview {
     max-height: 22em;
+    -st-vfade-offset: 24px;
 }
 
-.subscription-message {
-    font-style: italic;
+.chat-scrollview:ltr > StScrollBar {
+    padding-left: 6px;
 }
 
-.notification StEntry {
-    border-radius: 4px;
+.chat-scrollview:rtl > StScrollBar {
+    padding-right: 6px;
+}
+
+.chat-body {
+    spacing: 5px;
 }
 
 .summary-source-counter {
