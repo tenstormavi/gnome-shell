@@ -144,9 +144,8 @@ const WorldClocksSection = new Lang.Class({
         }
 
         this._locations.sort(function(a, b) {
-            let aCity = a.location.get_city_name();
-            let bCity = b.location.get_city_name();
-            return aCity.localeCompare(bCity);
+            return a.location.get_timezone().get_offset() -
+                   b.location.get_timezone().get_offset();
         });
 
         let layout = this._grid.layout_manager;
