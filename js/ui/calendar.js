@@ -974,10 +974,10 @@ const Message = new Lang.Class({
         let titleBox = new St.BoxLayout();
         contentBox.add_actor(titleBox);
 
-        let title = title ? _fixMarkup(title.replace(/\n/g, ' '), false) : '';
         this.titleLabel = new St.Label({ style_class: 'message-title',
-                                         text: title, x_expand: true,
+                                         x_expand: true,
                                          x_align: Clutter.ActorAlign.START });
+        this.setTitle(title);
         titleBox.add_actor(this.titleLabel);
 
         this._secondaryBin = new St.Bin({ style_class: 'message-secondary-bin' });
@@ -1015,12 +1015,21 @@ const Message = new Lang.Class({
         this._secondaryBin.child = actor;
     },
 
+    setTitle: function(text) {
+        let title = text ? _fixMarkup(text.replace(/\n/g, ' '), false) : '';
+        this.titleLabel.text = title;
+    },
+
+    setBody: function(text) {
+        this.bodyLabel.setMarkup(text || '', this._useBodyMarkup);
+    },
+
     setUseBodyMarkup: function(enable) {
         if (this._useBodyMarkup === enable)
             return;
         this._useBodyMarkup = enable;
         if (this.bodyLabel)
-            this.bodyLabel.setMarkup(this.bodyLabel.actor.text, enable);
+            this.setBody(this.bodyLabel.actor.text);
     },
 
     setActionArea: function(actor) {
@@ -1302,13 +1311,7 @@ const NotificationMessage = new Lang.Class({
         this.setUseBodyMarkup(notification.bannerBodyMarkup);
         this.parent(notification.title, notification.bannerBodyText);
 
-        let icon;
-        if (notification.gicon)
-            icon = new St.Icon({ gicon: notification.gicon, icon_size: 48 });
-        else
-            icon = notification.source.createIcon(48);
-
-        this.setIcon(icon);
+        this.setIcon(this._getIcon());
 
         this.actor.connect('clicked', Lang.bind(this,
             function() {
@@ -1319,11 +1322,27 @@ const NotificationMessage = new Lang.Class({
                 this._closed = true;
                 this.notification.destroy(MessageTray.NotificationDestroyedReason.DISMISSED);
             }));
-        this.notification.connect('destroy', Lang.bind(this,
+        notification.connect('destroy', Lang.bind(this,
             function() {
                 if (!this._closed)
                     this.emit('close');
             }));
+        this._updatedId = notification.connect('updated',
+                                               Lang.bind(this, this._onUpdated));
+    },
+
+    _getIcon: function() {
+        if (this.notification.gicon)
+            return new St.Icon({ gicon: this.notification.gicon, icon_size: 48 });
+        else
+            return this.notification.source.createIcon(48);
+    },
+
+    _onUpdated: function(n, clear) {
+        this.setIcon(this._getIcon());
+        this.setTitle(n.title);
+        this.setBody(n.bannerBodyText);
+        this.setUseBodyMarkup(n.bannerBodyMarkup);
     },
 
     canClear: function() {
