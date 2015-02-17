@@ -499,8 +499,27 @@ const NotificationBanner = new Lang.Class({
         this.parent(notification);
 
         this.actor.add_style_class_name('notification-banner');
+        this.actor.connect('destroy', Lang.bind(this, this._onDestroyed));
 
         this._buttonBox = null;
+
+        this.notification.actions.forEach(Lang.bind(this,
+            function(action) {
+                this.addAction(action.label, action.callback);
+            }));
+
+        this._activatedId = this.notification.connect('activated',
+            Lang.bind(this, function() {
+                // We hide all types of notifications once the user clicks on
+                // them because the common outcome of clicking should be the
+                // relevant window being brought forward and the user's
+                // attention switching to the window.
+                this.emit('done-displaying');
+            }));
+    },
+
+    _onDestroyed: function() {
+        this.notification.disconnect(this._activatedId);
     },
 
     addButton: function(button, callback) {
