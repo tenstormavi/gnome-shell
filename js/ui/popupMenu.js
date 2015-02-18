@@ -91,6 +91,7 @@ const PopupBaseMenuItem = new Lang.Class({
             this.actor.add_style_class_name(params.style_class);
 
         if (this._activatable) {
+            this.actor.connect('button-press-event', Lang.bind(this, this._onButtonPressEvent));
             this.actor.connect('button-release-event', Lang.bind(this, this._onButtonReleaseEvent));
             this.actor.connect('touch-event', Lang.bind(this, this._onTouchEvent));
             this.actor.connect('key-press-event', Lang.bind(this, this._onKeyPressEvent));
@@ -114,15 +115,26 @@ const PopupBaseMenuItem = new Lang.Class({
         this._parent = parent;
     },
 
+    _onButtonPressEvent: function (actor, event) {
+        // This is the CSS active state
+        this.actor.add_style_pseudo_class ('active');
+        return Clutter.EVENT_PROPAGATE;
+    },
+
     _onButtonReleaseEvent: function (actor, event) {
+        this.actor.remove_style_pseudo_class ('active');
         this.activate(event);
         return Clutter.EVENT_STOP;
     },
 
     _onTouchEvent: function (actor, event) {
         if (event.type() == Clutter.EventType.TOUCH_END) {
+            this.actor.remove_style_pseudo_class ('active');
             this.activate(event);
             return Clutter.EVENT_STOP;
+        } else if (event.type() == Clutter.EventType.TOUCH_BEGIN) {
+            // This is the CSS active state
+            this.actor.add_style_pseudo_class ('active');
         }
         return Clutter.EVENT_PROPAGATE;
     },
@@ -158,10 +170,11 @@ const PopupBaseMenuItem = new Lang.Class({
         if (activeChanged) {
             this.active = active;
             if (active) {
-                this.actor.add_style_pseudo_class('active');
+                this.actor.add_style_class_name('active');
                 this.actor.grab_key_focus();
             } else {
-                this.actor.remove_style_pseudo_class('active');
+                this.actor.remove_style_class_name('active');
+                this.actor.remove_style_pseudo_class ('active');
             }
             this.emit('active-changed', active);
         }
@@ -1125,6 +1138,9 @@ const PopupSubMenuMenuItem = new Lang.Class({
     },
 
     _onButtonReleaseEvent: function(actor) {
+        // Since we override the parent, we need to manage what the parent does
+        // with the active style class
+        this.actor.remove_style_pseudo_class ('active');
         this._setOpenState(!this._getOpenState());
         return Clutter.EVENT_PROPAGATE;
     }

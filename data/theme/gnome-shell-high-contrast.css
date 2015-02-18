@@ -763,10 +763,14 @@ StScrollBar {
     .popup-menu .popup-menu-item:checked {
       background-color: black;
       box-shadow: inset 0 1px 0px #0d0d0d; }
-    .popup-menu .popup-menu-item:active {
+    .popup-menu .popup-menu-item:hover {
       background-color: #215d9c; }
+    .popup-menu .popup-menu-item:active {
+      background-color: #1c5187; }
     .popup-menu .popup-menu-item:insensitive {
       background-color: rgba(0, 0, 0, 0.5); }
+  .popup-menu .active {
+    background-color: #215d9c; }
   .popup-menu .popup-inactive-menu-item {
     color: #fff; }
     .popup-menu .popup-inactive-menu-item:insensitive {
@@ -913,7 +917,8 @@ StScrollBar {
       -panel-corner-background-color: transparent;
       -panel-corner-border-color: transparent; }
   #panel .panel-button {
-    padding: 0px 12px;
+    -natural-hpadding: 12px;
+    -minimum-hpadding: 6px;
     font-weight: bold;
     color: #ccc;
     transition-duration: 100ms; }
@@ -1343,33 +1348,33 @@ StScrollBar {
   background-color: rgba(255, 255, 255, 0.1);
   transition-duration: 200ms; }
 
-.app-well-app.running > .overview-icon,
-.app-well-app.app-folder.running > .overview-icon,
-.show-apps.running > .overview-icon,
-.grid-search-result.running > .overview-icon {
+.app-well-app.running .overview-icon,
+.app-well-app.app-folder.running .overview-icon,
+.show-apps.running .overview-icon,
+.grid-search-result.running .overview-icon {
   text-shadow: black 0px 2px 2px; }
-.app-well-app:active > .overview-icon, .app-well-app:checked > .overview-icon,
-.app-well-app.app-folder:active > .overview-icon,
-.app-well-app.app-folder:checked > .overview-icon,
-.show-apps:active > .overview-icon,
-.show-apps:checked > .overview-icon,
-.grid-search-result:active > .overview-icon,
-.grid-search-result:checked > .overview-icon {
-  background-color: rgba(0, 0, 0, 0.9);
+.app-well-app:active .overview-icon, .app-well-app:checked .overview-icon,
+.app-well-app.app-folder:active .overview-icon,
+.app-well-app.app-folder:checked .overview-icon,
+.show-apps:active .overview-icon,
+.show-apps:checked .overview-icon,
+.grid-search-result:active .overview-icon,
+.grid-search-result:checked .overview-icon {
+  background-color: rgba(23, 25, 26, 0.9);
   box-shadow: inset 0 1px 2px black; }
-.app-well-app:hover > .overview-icon, .app-well-app.running:hover > .overview-icon, .app-well-app:focus > .overview-icon, .app-well-app:selected > .overview-icon,
-.app-well-app.app-folder:hover > .overview-icon,
-.app-well-app.app-folder.running:hover > .overview-icon,
-.app-well-app.app-folder:focus > .overview-icon,
-.app-well-app.app-folder:selected > .overview-icon,
-.show-apps:hover > .overview-icon,
-.show-apps.running:hover > .overview-icon,
-.show-apps:focus > .overview-icon,
-.show-apps:selected > .overview-icon,
-.grid-search-result:hover > .overview-icon,
-.grid-search-result.running:hover > .overview-icon,
-.grid-search-result:focus > .overview-icon,
-.grid-search-result:selected > .overview-icon {
+.app-well-app:hover .overview-icon, .app-well-app.running:hover .overview-icon, .app-well-app:focus .overview-icon, .app-well-app:selected .overview-icon,
+.app-well-app.app-folder:hover .overview-icon,
+.app-well-app.app-folder.running:hover .overview-icon,
+.app-well-app.app-folder:focus .overview-icon,
+.app-well-app.app-folder:selected .overview-icon,
+.show-apps:hover .overview-icon,
+.show-apps.running:hover .overview-icon,
+.show-apps:focus .overview-icon,
+.show-apps:selected .overview-icon,
+.grid-search-result:hover .overview-icon,
+.grid-search-result.running:hover .overview-icon,
+.grid-search-result:focus .overview-icon,
+.grid-search-result:selected .overview-icon {
   background-color: rgba(255, 255, 255, 0.1);
   transition-duration: 0ms;
   border-image: none;
@@ -1382,10 +1387,10 @@ StScrollBar {
   margin-bottom: 2px; }
 
 .search-provider-icon,
-.list-search-result, .app-well-app > .overview-icon,
-.app-well-app.app-folder > .overview-icon,
-.show-apps > .overview-icon,
-.grid-search-result > .overview-icon {
+.list-search-result, .app-well-app .overview-icon,
+.app-well-app.app-folder .overview-icon,
+.show-apps .overview-icon,
+.grid-search-result .overview-icon {
   border-radius: 4px;
   padding: 6px;
   border: 1px solid transparent;
